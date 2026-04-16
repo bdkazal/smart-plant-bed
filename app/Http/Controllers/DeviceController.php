@@ -5,30 +5,38 @@ namespace App\Http\Controllers;
 use App\Models\Device;
 use App\Models\DeviceCommand;
 use App\Models\WateringLog;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\View\View;
 
 class DeviceController extends Controller
 {
-    public function index()
+    public function index(): View
     {
-        $devices = Device::latest()->get();
+        $devices = Auth::user()
+            ->devices()
+            ->latest()
+            ->get();
 
         return view('devices.index', compact('devices'));
     }
 
-    public function show(Device $device)
+    public function show(Device $device): View
     {
+        $this->authorizeDevice($device);
+
         $today = now($device->timezone ?? config('app.timezone'))->dayOfWeekIso;
 
         $device->load([
             'wateringRule',
             'wateringSchedules' => fn($query) => $query
                 ->orderByRaw("
-                CASE
-                    WHEN day_of_week >= ? THEN day_of_week - ?
-                    ELSE day_of_week + 7 - ?
-                END
-            ", [$today, $today, $today])
+                    CASE
+                        WHEN day_of_week >= ? THEN day_of_week - ?
+                        ELSE day_of_week + 7 - ?
+                    END
+                ", [$today, $today, $today])
                 ->orderBy('time_of_day'),
             'sensorReadings' => fn($query) => $query->latest()->limit(5),
             'wateringLogs' => fn($query) => $query->latest()->limit(5),
@@ -40,8 +48,10 @@ class DeviceController extends Controller
         return view('devices.show', compact('device', 'latestReading'));
     }
 
-    public function waterNow(Request $request, Device $device)
+    public function waterNow(Request $request, Device $device): RedirectResponse
     {
+        $this->authorizeDevice($device);
+
         $validated = $request->validate([
             'duration_seconds' => ['required', 'integer', 'min:1', 'max:300'],
         ]);
@@ -60,7 +70,7 @@ class DeviceController extends Controller
             'device_id' => $device->id,
             'device_command_id' => $command->id,
             'trigger_type' => 'manual',
-            'duration_seconds' => $validated['duration_seconds'],
+            'duration_seconds' => (int) $validated['duration_seconds'],
             'status' => 'requested',
             'notes' => 'Manual watering requested from dashboard.',
         ]);
@@ -68,5 +78,14 @@ class DeviceController extends Controller
         return redirect()
             ->route('devices.show', $device)
             ->with('success', 'Watering command created successfully.');
+    }
+
+    private function authorizeDevice(Device $device): void
+    {
+        $user = Auth::user();
+
+        if (! $user || $device->user_id !== $user->id) {
+            abort(403);
+        }
     }
 }
