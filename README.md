@@ -1,58 +1,390 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Smart Plant Bed MVP
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+## Project Idea
 
-## About Laravel
+A simple commercial smart plant-bed monitoring and watering system.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+The product will use an ESP32-based device with sensors to monitor:
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- temperature
+- humidity
+- soil moisture
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+The system will also control a solenoid valve for watering.
 
-## Learning Laravel
+The device will connect to a Laravel backend API hosted on my VPS/domain, and customers will use a mobile-friendly web app to monitor and control it.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+---
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Main Goal
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+Build a simple, useful, easy-to-operate commercial device and service.
 
-## Agentic Development
+Version 1 should focus only on core useful features and avoid extra complexity.
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+The system should still be designed in a way that allows future expansion.
 
-```bash
-composer require laravel/boost --dev
+---
 
-php artisan boost:install
-```
+## MVP Features
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### Monitoring
 
-## Contributing
+- Show temperature
+- Show humidity
+- Show soil moisture
+- Show last updated time
+- Show device online/offline status
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Manual Control
 
-## Code of Conduct
+- Manual switch/button to run solenoid valve
+- Manual stop option
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### Scheduled Watering
 
-## Security Vulnerabilities
+- User can define watering schedule
+- Set start time
+- Set watering duration
+- Set days if needed
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Auto Watering
 
-## License
+- Auto-run solenoid valve when soil moisture goes below threshold
+- User can enable/disable auto mode
+- User can set threshold value
+- User can set watering duration
+- Optional cooldown period between auto watering cycles
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+---
+
+## Version 1 Scope
+
+This project should NOT try to do too much at the beginning.
+
+Version 1 should include only:
+
+1. sensor display
+2. manual valve control
+3. schedule-based watering
+4. soil-moisture-based auto watering
+
+No extra fancy features in MVP.
+
+---
+
+## Possible Future Features
+
+- multiple devices per user
+- charts/history analytics
+- notifications/alerts
+- water tank monitoring
+- fertilizer control
+- rain prediction integration
+- weather API integration
+- QR-based device pairing
+- subscription/payment system
+- team/farm management
+- admin dashboard
+- native app or PWA
+- MQTT or real-time communication
+- offline fallback logic on device
+
+---
+
+## Target Users
+
+Possible target users:
+
+- home gardeners
+- rooftop gardeners
+- small-scale farmers
+- nursery owners
+- greenhouse users
+- hobby growers
+
+---
+
+## Product Value
+
+This product should help users:
+
+- monitor plant-bed condition remotely
+- reduce manual checking
+- control watering remotely
+- automate watering in a simple way
+- save time and improve watering consistency
+
+---
+
+## Tech Stack (Planned)
+
+### Device Side
+
+- ESP32
+- soil moisture sensor
+- temperature/humidity sensor
+- relay or proper driver for solenoid valve
+
+### Backend
+
+- Laravel
+- MySQL
+- Laravel Sanctum for user authentication
+- REST API
+
+### Frontend
+
+- mobile-friendly web app
+- first version may use Blade + JavaScript
+- later version may use Vue.js
+
+### Hosting
+
+- domain + Hostinger VPS
+- production server on VPS
+- no Home Assistant or CasaOS for commercial version
+
+---
+
+## Architecture Idea
+
+### Device
+
+The ESP32 device will:
+
+- read sensor values
+- send readings to backend
+- fetch config/commands from backend
+- control solenoid valve
+
+### Backend
+
+Laravel will:
+
+- manage users
+- manage devices
+- store sensor readings
+- store schedule settings
+- store auto-watering rules
+- handle manual commands
+- serve dashboard data
+
+### Frontend
+
+The web app will:
+
+- allow login
+- show device dashboard
+- show current readings
+- allow manual valve control
+- allow schedule setup
+- allow auto mode setup
+
+---
+
+## Authentication Strategy
+
+### User Authentication
+
+- Laravel Sanctum
+- email/password login
+- mobile web app uses user token
+
+### Device Authentication
+
+- separate device token or pairing token
+- ESP32 should not use normal user login
+- each device should have its own secure identity
+
+---
+
+## Pairing Idea
+
+Possible pairing flow:
+
+1. device has serial number / pairing code / QR code
+2. customer creates account or logs in
+3. customer adds device using pairing code
+4. backend links device to that customer
+5. device becomes visible in dashboard
+
+---
+
+## Device Communication Idea
+
+### Sensor Upload
+
+ESP32 sends:
+
+- temperature
+- humidity
+- soil moisture
+- current valve status
+- timestamp / heartbeat
+
+### Config Fetch
+
+ESP32 fetches:
+
+- manual run command
+- schedule settings
+- auto-watering settings
+
+### Control Strategy
+
+For MVP, use simple polling:
+
+- send readings every 1 to 5 minutes
+- fetch config every 20 to 60 seconds
+
+This is simpler than using MQTT or WebSockets in version 1.
+
+---
+
+## Core Backend Resources
+
+Likely main resources:
+
+- users
+- devices
+- sensor_readings
+- valve_commands
+- watering_schedules
+- auto_rules
+- device_logs
+
+---
+
+## Core User Flows
+
+### User Flow
+
+1. user registers/logs in
+2. user pairs device
+3. user sees device dashboard
+4. user sees latest readings
+5. user manually runs valve if needed
+6. user sets watering schedule
+7. user sets auto watering threshold
+
+### Device Flow
+
+1. device connects to Wi-Fi
+2. device authenticates to backend
+3. device uploads readings
+4. device fetches commands/settings
+5. device runs valve when instructed
+6. device reports status
+
+---
+
+## Main Dashboard Idea
+
+The dashboard should show:
+
+- device name
+- online/offline status
+- temperature
+- humidity
+- soil moisture
+- valve status
+- last updated time
+- manual ON/OFF controls
+- schedule summary
+- auto mode summary
+
+Keep the UI simple and mobile-friendly.
+
+---
+
+## Hardware Notes
+
+Important hardware concerns:
+
+- proper power design for ESP32 and solenoid valve
+- relay/MOSFET/driver circuit
+- flyback diode for valve protection
+- sensor quality and reliability
+- waterproofing and outdoor durability
+- stable Wi-Fi connection
+- safe enclosure
+
+---
+
+## Business Notes
+
+This should be a simple product first, not a complex platform.
+
+Main commercial promise:
+“Monitor your plant bed remotely and automate watering simply.”
+
+The focus should be reliability, ease of setup, and ease of use.
+
+---
+
+## Development Priority Order
+
+### Phase 1
+
+- user auth
+- device model
+- device registration/pairing
+
+### Phase 2
+
+- sensor reading upload
+- reading storage
+- device dashboard
+
+### Phase 3
+
+- manual valve ON/OFF control
+
+### Phase 4
+
+- watering schedule
+
+### Phase 5
+
+- auto watering by soil moisture threshold
+
+### Phase 6
+
+- product polish
+- better UI
+- better pairing flow
+- logs and reliability improvements
+
+---
+
+## What I Should NOT Do Early
+
+- do not start with native mobile app
+- do not start with Home Assistant integration
+- do not start with MQTT unless needed
+- do not add too many extra features
+- do not overcomplicate the frontend at the beginning
+
+---
+
+## Current Direction
+
+Build a commercial MVP using:
+
+- ESP32
+- Laravel API
+- MySQL
+- mobile-friendly web app
+- VPS hosting on my own domain
+
+Keep version 1 simple, useful, and expandable.
+
+IDEA:
+
+1. Safety/Hazzard Notification from App, if ignored for a dangerous amount of time, then from Company Safety Agent.
+   For example Solenoid valves open for several hours, or moisture is 0%, fire/smoke alarms etc.
+
+2. Add light intensity sensor
+
+3. Add rain sensor mode is on, then if it rains for a certain period of time, scheduled watering will be off.
