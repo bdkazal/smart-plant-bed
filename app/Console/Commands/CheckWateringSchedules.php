@@ -21,17 +21,17 @@ class CheckWateringSchedules extends Command
             ? $this->normalizeTime((string) $this->option('time'))
             : null;
 
-        if ($this->option('time') && !$overrideTime) {
+        if ($this->option('time') && ! $overrideTime) {
             $this->error('Invalid --time value. Use HH:MM or HH:MM:SS');
             return self::FAILURE;
         }
 
-        if (!is_null($overrideDay) && ($overrideDay < 1 || $overrideDay > 7)) {
+        if (! is_null($overrideDay) && ($overrideDay < 1 || $overrideDay > 7)) {
             $this->error('Invalid --day value. Use 1 to 7 (1=Monday, 7=Sunday).');
             return self::FAILURE;
         }
 
-        $schedules = WateringSchedule::with('device')
+        $schedules = WateringSchedule::with(['device.wateringRule'])
             ->where('is_enabled', true)
             ->get();
 
@@ -40,7 +40,11 @@ class CheckWateringSchedules extends Command
         foreach ($schedules as $schedule) {
             $device = $schedule->device;
 
-            if (!$device) {
+            if (! $device || ! $device->wateringRule) {
+                continue;
+            }
+
+            if ($device->wateringRule->watering_mode !== 'schedule') {
                 continue;
             }
 

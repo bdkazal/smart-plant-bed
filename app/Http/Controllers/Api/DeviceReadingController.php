@@ -23,7 +23,7 @@ class DeviceReadingController extends Controller
 
         $deviceKey = $request->header('X-DEVICE-KEY');
 
-        if (!$deviceKey) {
+        if (! $deviceKey) {
             return response()->json([
                 'message' => 'Missing device API key.',
             ], 401);
@@ -34,7 +34,7 @@ class DeviceReadingController extends Controller
             ->where('api_key', $deviceKey)
             ->first();
 
-        if (!$device) {
+        if (! $device) {
             return response()->json([
                 'message' => 'Invalid device credentials.',
             ], 401);
@@ -58,13 +58,14 @@ class DeviceReadingController extends Controller
 
         if (
             $rule &&
-            $rule->auto_mode_enabled &&
-            !is_null($reading->soil_moisture) &&
+            $rule->watering_mode === 'auto' &&
+            ! is_null($reading->soil_moisture) &&
+            ! is_null($rule->soil_moisture_threshold) &&
             $reading->soil_moisture <= $rule->soil_moisture_threshold
         ) {
             $hasActiveCommand = DeviceCommand::where('device_id', $device->id)
-                ->whereIn('status', ['pending', 'acknowledged'])
                 ->where('command_type', 'valve_on')
+                ->whereIn('status', ['pending', 'acknowledged'])
                 ->exists();
 
             $lastCompletedAutoLog = WateringLog::where('device_id', $device->id)
@@ -77,16 +78,19 @@ class DeviceReadingController extends Controller
 
             if ($lastCompletedAutoLog && $lastCompletedAutoLog->ended_at) {
                 $cooldownPassed = $lastCompletedAutoLog->ended_at
-                    ->addMinutes($rule->cooldown_minutes)
+                    ->copy()
+                    ->addMinutes((int) $rule->cooldown_minutes)
                     ->isPast();
             }
 
-            if (!$hasActiveCommand && $cooldownPassed) {
+            if (! $hasActiveCommand && $cooldownPassed) {
+                $durationSeconds = (int) ($rule->max_watering_duration_seconds ?? 30);
+
                 $command = DeviceCommand::create([
                     'device_id' => $device->id,
                     'command_type' => 'valve_on',
                     'payload' => [
-                        'duration_seconds' => (int) $rule->max_watering_duration_seconds,
+                        'duration_seconds' => $durationSeconds,
                     ],
                     'status' => 'pending',
                     'issued_at' => now(),
@@ -96,7 +100,7 @@ class DeviceReadingController extends Controller
                     'device_id' => $device->id,
                     'device_command_id' => $command->id,
                     'trigger_type' => 'auto',
-                    'duration_seconds' => (int) $rule->max_watering_duration_seconds,
+                    'duration_seconds' => $durationSeconds,
                     'status' => 'requested',
                     'notes' => 'Auto watering triggered by low soil moisture.',
                 ]);

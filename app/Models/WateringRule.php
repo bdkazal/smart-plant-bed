@@ -9,6 +9,7 @@ class WateringRule extends Model
 {
     protected $fillable = [
         'device_id',
+        'watering_mode',
         'auto_mode_enabled',
         'soil_moisture_threshold',
         'max_watering_duration_seconds',

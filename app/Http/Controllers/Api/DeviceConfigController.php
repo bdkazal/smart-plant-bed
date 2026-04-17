@@ -17,7 +17,7 @@ class DeviceConfigController extends Controller
 
         $deviceKey = $request->header('X-DEVICE-KEY');
 
-        if (!$deviceKey) {
+        if (! $deviceKey) {
             return response()->json([
                 'message' => 'Missing device API key.',
             ], 401);
@@ -33,11 +33,13 @@ class DeviceConfigController extends Controller
             ->where('api_key', $deviceKey)
             ->first();
 
-        if (!$device) {
+        if (! $device) {
             return response()->json([
                 'message' => 'Invalid device credentials.',
             ], 401);
         }
+
+        $rule = $device->wateringRule;
 
         return response()->json([
             'message' => 'Device config fetched successfully.',
@@ -45,11 +47,11 @@ class DeviceConfigController extends Controller
                 'device_uuid' => $device->uuid,
                 'device_name' => $device->name,
                 'timezone' => $device->timezone ?? 'Asia/Dhaka',
-                'auto_mode_enabled' => $device->wateringRule?->auto_mode_enabled ?? false,
-                'soil_moisture_threshold' => $device->wateringRule?->soil_moisture_threshold,
-                'max_watering_duration_seconds' => $device->wateringRule?->max_watering_duration_seconds ?? 30,
-                'cooldown_minutes' => $device->wateringRule?->cooldown_minutes ?? 60,
-                'local_manual_duration_seconds' => $device->wateringRule?->local_manual_duration_seconds ?? 30,
+                'watering_mode' => $rule?->watering_mode ?? 'schedule',
+                'soil_moisture_threshold' => $rule?->soil_moisture_threshold,
+                'max_watering_duration_seconds' => $rule?->max_watering_duration_seconds ?? 30,
+                'cooldown_minutes' => $rule?->cooldown_minutes ?? 60,
+                'local_manual_duration_seconds' => $rule?->local_manual_duration_seconds ?? 30,
                 'schedules' => $device->wateringSchedules->map(function ($schedule) {
                     return [
                         'id' => $schedule->id,
