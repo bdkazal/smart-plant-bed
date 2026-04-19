@@ -212,9 +212,12 @@ class DeviceController extends Controller
             ->route('devices.show', $device)
             ->with('success', 'Start watering command created successfully.');
     }
+
     public function stopWatering(Device $device): RedirectResponse
     {
         $this->authorizeDevice($device);
+
+        $this->expireStalePendingCommands($device);
 
         if ($device->status !== 'active') {
             return redirect()
