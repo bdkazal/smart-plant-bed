@@ -163,10 +163,23 @@ class DeviceController extends Controller
                 ->withInput();
         }
 
+        $hasActiveStartCommand = DeviceCommand::where('device_id', $device->id)
+            ->where('command_type', 'valve_on')
+            ->whereIn('status', ['pending', 'acknowledged'])
+            ->exists();
+
         $hasPendingStopCommand = DeviceCommand::where('device_id', $device->id)
             ->where('command_type', 'valve_off')
             ->whereIn('status', ['pending', 'acknowledged'])
             ->exists();
+
+        if ($hasActiveStartCommand) {
+            return redirect()
+                ->route('devices.show', $device)
+                ->withErrors([
+                    'duration_seconds' => 'A watering request already exists. Use Stop Watering instead.',
+                ]);
+        }
 
         if ($hasPendingStopCommand) {
             return redirect()

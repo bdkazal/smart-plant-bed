@@ -101,6 +101,19 @@ class DeviceCommandController extends Controller
                 'acknowledged_at' => $command->acknowledged_at ?? now(),
             ]);
 
+            if ($command->command_type === 'valve_off') {
+                $activeLog = WateringLog::where('device_id', $device->id)
+                    ->whereIn('status', ['requested', 'running'])
+                    ->latest('id')
+                    ->first();
+
+                if ($activeLog) {
+                    $activeLog->update([
+                        'notes' => trim(($activeLog->notes ? $activeLog->notes . ' ' : '') . 'Stop request acknowledged by device.'),
+                    ]);
+                }
+            }
+
             if ($command->command_type === 'valve_on' && $log) {
                 $log->update([
                     'status' => 'running',
