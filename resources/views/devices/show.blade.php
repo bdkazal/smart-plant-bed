@@ -300,7 +300,14 @@
             </div>
 
             <div class="rounded-lg bg-white p-6 shadow">
-                <h2 class="mb-4 text-xl font-semibold">Watering Schedules</h2>
+                <div class="mb-4 flex items-center justify-between">
+                    <h2 class="text-xl font-semibold">Watering Schedules</h2>
+                    <a
+                        href="{{ route('devices.schedules.create', $device) }}"
+                        class="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
+                        Add Schedule
+                    </a>
+                </div>
 
                 @php
                 $days = [
@@ -315,14 +322,52 @@
                 @endphp
 
                 @forelse($device->wateringSchedules as $schedule)
-                <div class="border-b py-2 last:border-b-0">
+                <div class="border-b py-3 last:border-b-0">
                     <p><strong>Status:</strong> {{ $schedule->is_enabled ? 'Enabled' : 'Disabled' }}</p>
                     <p><strong>Day:</strong> {{ $days[$schedule->day_of_week] ?? 'Unknown' }}</p>
                     <p><strong>Time:</strong> {{ $schedule->time_of_day }}</p>
                     <p><strong>Duration:</strong> {{ $schedule->duration_seconds }} sec</p>
+
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <a
+                            href="{{ route('devices.schedules.edit', [$device, $schedule]) }}"
+                            class="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
+                            Edit
+                        </a>
+
+                        <form action="{{ route('devices.schedules.toggle', [$device, $schedule]) }}" method="POST">
+                            @csrf
+                            @method('PATCH')
+                            <button
+                                type="submit"
+                                class="rounded bg-yellow-600 px-3 py-2 text-sm text-white hover:bg-yellow-700">
+                                {{ $schedule->is_enabled ? 'Disable' : 'Enable' }}
+                            </button>
+                        </form>
+
+                        <form
+                            action="{{ route('devices.schedules.destroy', [$device, $schedule]) }}"
+                            method="POST"
+                            onsubmit="return confirm('Are you sure you want to delete this schedule?');">
+                            @csrf
+                            @method('DELETE')
+                            <button
+                                type="submit"
+                                class="rounded bg-red-600 px-3 py-2 text-sm text-white hover:bg-red-700">
+                                Delete
+                            </button>
+                        </form>
+                    </div>
                 </div>
                 @empty
-                <p class="text-gray-500">No watering schedules found.</p>
+                <div>
+                    <p class="text-gray-500">No watering schedules found.</p>
+                    <a
+                        href="{{ route('devices.schedules.create', $device) }}"
+                        class="mt-3 inline-flex rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
+                        Create First Schedule
+                    </a>
+                </div>
                 @endforelse
             </div>
         </div>

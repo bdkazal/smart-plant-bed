@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DeviceClaimController;
 use App\Http\Controllers\DeviceController;
+use App\Http\Controllers\WateringScheduleController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -21,6 +22,19 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/claim/{code}', [DeviceClaimController::class, 'confirm'])->name('devices.claim.confirm');
 
     Route::get('/devices/{device}/setup', [DeviceClaimController::class, 'setup'])->name('devices.setup');
+
+    Route::get('/devices/{device}/schedules/create', [WateringScheduleController::class, 'create'])
+        ->name('devices.schedules.create');
+    Route::post('/devices/{device}/schedules', [WateringScheduleController::class, 'store'])
+        ->name('devices.schedules.store');
+    Route::get('/devices/{device}/schedules/{schedule}/edit', [WateringScheduleController::class, 'edit'])
+        ->name('devices.schedules.edit');
+    Route::put('/devices/{device}/schedules/{schedule}', [WateringScheduleController::class, 'update'])
+        ->name('devices.schedules.update');
+    Route::patch('/devices/{device}/schedules/{schedule}/toggle', [WateringScheduleController::class, 'toggle'])
+        ->name('devices.schedules.toggle');
+    Route::delete('/devices/{device}/schedules/{schedule}', [WateringScheduleController::class, 'destroy'])
+        ->name('devices.schedules.destroy');
 
     Route::get('/devices/{device}', [DeviceController::class, 'show'])->name('devices.show');
     Route::post('/devices/{device}/settings', [DeviceController::class, 'updateSettings'])->name('devices.settings.update');
