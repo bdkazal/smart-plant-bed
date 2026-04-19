@@ -23,5 +23,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/devices/{device}/setup', [DeviceClaimController::class, 'setup'])->name('devices.setup');
 
     Route::get('/devices/{device}', [DeviceController::class, 'show'])->name('devices.show');
+    Route::post('/devices/{device}/settings', [DeviceController::class, 'updateSettings'])->name('devices.settings.update');
     Route::post('/devices/{device}/water-now', [DeviceController::class, 'waterNow'])->name('devices.water-now');
+    Route::post('/devices/{device}/water-stop', [DeviceController::class, 'stopWatering'])->name('devices.water-stop');
 });
