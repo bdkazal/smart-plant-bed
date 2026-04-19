@@ -26,17 +26,19 @@ class DeviceController extends Controller
     {
         $this->authorizeDevice($device);
 
+        $this->expireStalePendingCommands($device);
+
         $today = now($device->timezone ?? config('app.timezone'))->dayOfWeekIso;
 
         $device->load([
             'wateringRule',
             'wateringSchedules' => fn($query) => $query
                 ->orderByRaw("
-                    CASE
-                        WHEN day_of_week >= ? THEN day_of_week - ?
-                        ELSE day_of_week + 7 - ?
-                    END
-                ", [$today, $today, $today])
+                CASE
+                    WHEN day_of_week >= ? THEN day_of_week - ?
+                    ELSE day_of_week + 7 - ?
+                END
+            ", [$today, $today, $today])
                 ->orderBy('time_of_day'),
             'sensorReadings' => fn($query) => $query->latest()->limit(5),
             'wateringLogs' => fn($query) => $query->latest()->limit(5),
@@ -136,6 +138,8 @@ class DeviceController extends Controller
     {
         $this->authorizeDevice($device);
 
+        $this->expireStalePendingCommands($device);
+
         if ($device->status !== 'active') {
             return redirect()
                 ->route('devices.show', $device)
@@ -159,23 +163,10 @@ class DeviceController extends Controller
                 ->withInput();
         }
 
-        $hasActiveStartCommand = DeviceCommand::where('device_id', $device->id)
-            ->where('command_type', 'valve_on')
-            ->whereIn('status', ['pending', 'acknowledged'])
-            ->exists();
-
         $hasPendingStopCommand = DeviceCommand::where('device_id', $device->id)
             ->where('command_type', 'valve_off')
             ->whereIn('status', ['pending', 'acknowledged'])
             ->exists();
-
-        if ($hasActiveStartCommand) {
-            return redirect()
-                ->route('devices.show', $device)
-                ->withErrors([
-                    'duration_seconds' => 'A watering request already exists. Use Stop Watering instead.',
-                ]);
-        }
 
         if ($hasPendingStopCommand) {
             return redirect()
@@ -208,7 +199,6 @@ class DeviceController extends Controller
             ->route('devices.show', $device)
             ->with('success', 'Start watering command created successfully.');
     }
-
     public function stopWatering(Device $device): RedirectResponse
     {
         $this->authorizeDevice($device);
@@ -267,6 +257,27 @@ class DeviceController extends Controller
 
         if (! $user || $device->user_id !== $user->id) {
             abort(403);
+        }
+    }
+
+    private function expireStalePendingCommands(Device $device): void
+    {
+        $expiredCommands = DeviceCommand::where('device_id', $device->id)
+            ->where('status', 'pending')
+            ->where('issued_at', '<', now()->subMinute())
+            ->get();
+
+        foreach ($expiredCommands as $expiredCommand) {
+            $expiredCommand->update([
+                'status' => 'expired',
+            ]);
+
+            WateringLog::where('device_command_id', $expiredCommand->id)
+                ->where('status', 'requested')
+                ->update([
+                    'status' => 'failed',
+                    'notes' => 'Command expired before device confirmation.',
+                ]);
         }
     }
 }

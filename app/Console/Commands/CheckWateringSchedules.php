@@ -48,6 +48,8 @@ class CheckWateringSchedules extends Command
                 continue;
             }
 
+            $this->expireStalePendingCommands($device);
+
             $deviceTimezone = $device->timezone ?: 'Asia/Dhaka';
             $deviceNow = Carbon::now($deviceTimezone);
 
@@ -110,5 +112,26 @@ class CheckWateringSchedules extends Command
         }
 
         return null;
+    }
+
+    private function expireStalePendingCommands($device): void
+    {
+        $expiredCommands = DeviceCommand::where('device_id', $device->id)
+            ->where('status', 'pending')
+            ->where('issued_at', '<', now()->subMinute())
+            ->get();
+
+        foreach ($expiredCommands as $expiredCommand) {
+            $expiredCommand->update([
+                'status' => 'expired',
+            ]);
+
+            WateringLog::where('device_command_id', $expiredCommand->id)
+                ->where('status', 'requested')
+                ->update([
+                    'status' => 'failed',
+                    'notes' => 'Command expired before device confirmation.',
+                ]);
+        }
     }
 }

@@ -4,9 +4,10 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Device;
+use App\Models\DeviceCommand;
+use App\Models\WateringLog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\Models\DeviceCommand;
 
 class DeviceCommandController extends Controller
 {
@@ -18,7 +19,7 @@ class DeviceCommandController extends Controller
 
         $deviceKey = $request->header('X-DEVICE-KEY');
 
-        if (!$deviceKey) {
+        if (! $deviceKey) {
             return response()->json([
                 'message' => 'Missing device API key.',
             ], 401);
@@ -28,23 +29,20 @@ class DeviceCommandController extends Controller
             ->where('api_key', $deviceKey)
             ->first();
 
-        if (!$device) {
+        if (! $device) {
             return response()->json([
                 'message' => 'Invalid device credentials.',
             ], 401);
         }
 
-        // $command = $device->deviceCommands()
-        //     ->where('status', 'pending')
-        //     ->latest()
-        //     ->first();
+        $this->expireStalePendingCommands($device);
 
         $command = $device->deviceCommands()
             ->where('status', 'pending')
             ->oldest('id')
             ->first();
 
-        if (!$command) {
+        if (! $command) {
             return response()->json([
                 'message' => 'No pending commands.',
                 'command' => null,
@@ -73,7 +71,7 @@ class DeviceCommandController extends Controller
 
         $deviceKey = $request->header('X-DEVICE-KEY');
 
-        if (!$deviceKey) {
+        if (! $deviceKey) {
             return response()->json([
                 'message' => 'Missing device API key.',
             ], 401);
@@ -83,7 +81,7 @@ class DeviceCommandController extends Controller
             ->where('api_key', $deviceKey)
             ->first();
 
-        if (!$device) {
+        if (! $device) {
             return response()->json([
                 'message' => 'Invalid device credentials.',
             ], 401);
@@ -103,7 +101,7 @@ class DeviceCommandController extends Controller
                 'acknowledged_at' => $command->acknowledged_at ?? now(),
             ]);
 
-            if ($log) {
+            if ($command->command_type === 'valve_on' && $log) {
                 $log->update([
                     'status' => 'running',
                     'started_at' => $log->started_at ?? now(),
@@ -118,12 +116,36 @@ class DeviceCommandController extends Controller
                 'executed_at' => now(),
             ]);
 
-            if ($log) {
+            if ($command->command_type === 'valve_on' && $log) {
                 $log->update([
                     'status' => 'completed',
                     'started_at' => $log->started_at ?? now(),
                     'ended_at' => now(),
                 ]);
+            }
+
+            if ($command->command_type === 'valve_off') {
+                $activeLog = WateringLog::where('device_id', $device->id)
+                    ->whereIn('status', ['requested', 'running'])
+                    ->latest('id')
+                    ->first();
+
+                if ($activeLog) {
+                    $activeLog->update([
+                        'status' => 'completed',
+                        'ended_at' => now(),
+                        'notes' => trim(($activeLog->notes ? $activeLog->notes . ' ' : '') . 'Stopped by valve_off command.'),
+                    ]);
+                }
+
+                DeviceCommand::where('device_id', $device->id)
+                    ->where('command_type', 'valve_on')
+                    ->whereIn('status', ['pending', 'acknowledged'])
+                    ->update([
+                        'status' => 'executed',
+                        'acknowledged_at' => now(),
+                        'executed_at' => now(),
+                    ]);
             }
         }
 
@@ -146,5 +168,26 @@ class DeviceCommandController extends Controller
             'command_id' => $command->id,
             'status' => $command->fresh()->status,
         ]);
+    }
+
+    private function expireStalePendingCommands(Device $device): void
+    {
+        $expiredCommands = DeviceCommand::where('device_id', $device->id)
+            ->where('status', 'pending')
+            ->where('issued_at', '<', now()->subMinute())
+            ->get();
+
+        foreach ($expiredCommands as $expiredCommand) {
+            $expiredCommand->update([
+                'status' => 'expired',
+            ]);
+
+            WateringLog::where('device_command_id', $expiredCommand->id)
+                ->where('status', 'requested')
+                ->update([
+                    'status' => 'failed',
+                    'notes' => 'Command expired before device confirmation.',
+                ]);
+        }
     }
 }

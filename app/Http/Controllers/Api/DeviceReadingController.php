@@ -63,6 +63,8 @@ class DeviceReadingController extends Controller
             ! is_null($rule->soil_moisture_threshold) &&
             $reading->soil_moisture <= $rule->soil_moisture_threshold
         ) {
+            $this->expireStalePendingCommands($device);
+
             $hasActiveCommand = DeviceCommand::where('device_id', $device->id)
                 ->where('command_type', 'valve_on')
                 ->whereIn('status', ['pending', 'acknowledged'])
@@ -115,5 +117,26 @@ class DeviceReadingController extends Controller
             'reading_id' => $reading->id,
             'auto_watering_triggered' => $autoWateringTriggered,
         ], 201);
+    }
+
+    private function expireStalePendingCommands(Device $device): void
+    {
+        $expiredCommands = DeviceCommand::where('device_id', $device->id)
+            ->where('status', 'pending')
+            ->where('issued_at', '<', now()->subMinute())
+            ->get();
+
+        foreach ($expiredCommands as $expiredCommand) {
+            $expiredCommand->update([
+                'status' => 'expired',
+            ]);
+
+            WateringLog::where('device_command_id', $expiredCommand->id)
+                ->where('status', 'requested')
+                ->update([
+                    'status' => 'failed',
+                    'notes' => 'Command expired before device confirmation.',
+                ]);
+        }
     }
 }
