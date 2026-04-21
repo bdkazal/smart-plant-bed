@@ -11,6 +11,17 @@ use Illuminate\View\View;
 
 class WateringScheduleController extends Controller
 {
+    public function index(Device $device): View
+    {
+        $this->authorizeDevice($device);
+
+        $device->load([
+            'wateringSchedules' => fn($query) => $query->orderBy('day_of_week')->orderBy('time_of_day'),
+        ]);
+
+        return view('devices.schedules.index', compact('device'));
+    }
+
     public function create(Device $device): View
     {
         $this->authorizeDevice($device);
@@ -38,7 +49,7 @@ class WateringScheduleController extends Controller
         ]);
 
         return redirect()
-            ->route('devices.show', $device)
+            ->route('devices.schedules.index', $device)
             ->with('success', 'Watering schedule created successfully.');
     }
 
@@ -68,7 +79,7 @@ class WateringScheduleController extends Controller
         ]);
 
         return redirect()
-            ->route('devices.show', $device)
+            ->route('devices.schedules.index', $device)
             ->with('success', 'Watering schedule updated successfully.');
     }
 
@@ -79,7 +90,7 @@ class WateringScheduleController extends Controller
         $schedule->delete();
 
         return redirect()
-            ->route('devices.show', $device)
+            ->route('devices.schedules.index', $device)
             ->with('success', 'Watering schedule deleted successfully.');
     }
 
@@ -92,7 +103,7 @@ class WateringScheduleController extends Controller
         ]);
 
         return redirect()
-            ->route('devices.show', $device)
+            ->route('devices.schedules.index', $device)
             ->with('success', 'Watering schedule status updated successfully.');
     }
 

@@ -23,6 +23,16 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/devices/{device}/setup', [DeviceClaimController::class, 'setup'])->name('devices.setup');
 
+    Route::get('/devices/{device}', [DeviceController::class, 'show'])->name('devices.show');
+    Route::get('/devices/{device}/automation', [DeviceController::class, 'automation'])->name('devices.automation');
+    Route::get('/devices/{device}/history', [DeviceController::class, 'history'])->name('devices.history');
+
+    Route::post('/devices/{device}/settings', [DeviceController::class, 'updateSettings'])->name('devices.settings.update');
+    Route::post('/devices/{device}/water-now', [DeviceController::class, 'waterNow'])->name('devices.water-now');
+    Route::post('/devices/{device}/water-stop', [DeviceController::class, 'stopWatering'])->name('devices.water-stop');
+
+    Route::get('/devices/{device}/schedules', [WateringScheduleController::class, 'index'])
+        ->name('devices.schedules.index');
     Route::get('/devices/{device}/schedules/create', [WateringScheduleController::class, 'create'])
         ->name('devices.schedules.create');
     Route::post('/devices/{device}/schedules', [WateringScheduleController::class, 'store'])
@@ -35,9 +45,4 @@ Route::middleware(['auth'])->group(function () {
         ->name('devices.schedules.toggle');
     Route::delete('/devices/{device}/schedules/{schedule}', [WateringScheduleController::class, 'destroy'])
         ->name('devices.schedules.destroy');
-
-    Route::get('/devices/{device}', [DeviceController::class, 'show'])->name('devices.show');
-    Route::post('/devices/{device}/settings', [DeviceController::class, 'updateSettings'])->name('devices.settings.update');
-    Route::post('/devices/{device}/water-now', [DeviceController::class, 'waterNow'])->name('devices.water-now');
-    Route::post('/devices/{device}/water-stop', [DeviceController::class, 'stopWatering'])->name('devices.water-stop');
 });

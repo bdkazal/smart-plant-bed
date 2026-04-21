@@ -25,28 +25,19 @@ class DeviceController extends Controller
     public function show(Device $device): View
     {
         $this->authorizeDevice($device);
-
         $this->expireStalePendingCommands($device);
-
-        $today = now($device->timezone ?? config('app.timezone'))->dayOfWeekIso;
 
         $device->load([
             'wateringRule',
-            'wateringSchedules' => fn($query) => $query
-                ->orderByRaw("
-                CASE
-                    WHEN day_of_week >= ? THEN day_of_week - ?
-                    ELSE day_of_week + 7 - ?
-                END
-            ", [$today, $today, $today])
-                ->orderBy('time_of_day'),
-            'sensorReadings' => fn($query) => $query->latest()->limit(5),
-            'wateringLogs' => fn($query) => $query->latest()->limit(5),
-            'deviceCommands' => fn($query) => $query->latest()->limit(5),
+            'sensorReadings' => fn($query) => $query->latest()->limit(1),
+            'wateringSchedules' => fn($query) => $query->where('is_enabled', true)->orderBy('day_of_week')->orderBy('time_of_day'),
         ]);
 
         $latestReading = $device->sensorReadings->first();
-        $manualMaxDuration = $device->wateringRule?->max_watering_duration_seconds ?? 300;
+        $latestActiveWateringLog = $device->wateringLogs()
+            ->whereIn('status', ['requested', 'running'])
+            ->latest('id')
+            ->first();
 
         $activeValveOnCommand = DeviceCommand::where('device_id', $device->id)
             ->where('command_type', 'valve_on')
@@ -60,11 +51,6 @@ class DeviceController extends Controller
             ->latest('id')
             ->first();
 
-        $latestActiveWateringLog = $device->wateringLogs()
-            ->whereIn('status', ['requested', 'running'])
-            ->latest('id')
-            ->first();
-
         $manualWateringState = 'idle';
 
         if ($activeValveOffCommand) {
@@ -75,16 +61,50 @@ class DeviceController extends Controller
             $manualWateringState = 'running';
         }
 
-        $timezoneOptions = $this->getTimezoneOptions();
+        $manualMaxDuration = $device->wateringRule?->max_watering_duration_seconds ?? 300;
+        $enabledScheduleCount = $device->wateringSchedules->count();
 
         return view('devices.show', compact(
             'device',
             'latestReading',
-            'manualMaxDuration',
             'latestActiveWateringLog',
             'manualWateringState',
+            'manualMaxDuration',
+            'enabledScheduleCount'
+        ));
+    }
+
+    public function automation(Device $device): View
+    {
+        $this->authorizeDevice($device);
+        $this->expireStalePendingCommands($device);
+
+        $device->load([
+            'wateringRule',
+            'sensorReadings' => fn($query) => $query->latest()->limit(1),
+        ]);
+
+        $latestReading = $device->sensorReadings->first();
+        $timezoneOptions = timezone_identifiers_list();
+
+        return view('devices.automation', compact(
+            'device',
+            'latestReading',
             'timezoneOptions'
         ));
+    }
+
+    public function history(Device $device): View
+    {
+        $this->authorizeDevice($device);
+        $this->expireStalePendingCommands($device);
+
+        $device->load([
+            'wateringLogs' => fn($query) => $query->latest()->limit(20),
+            'deviceCommands' => fn($query) => $query->latest()->limit(20),
+        ]);
+
+        return view('devices.history', compact('device'));
     }
 
     public function updateSettings(Request $request, Device $device): RedirectResponse
@@ -106,10 +126,7 @@ class DeviceController extends Controller
 
         if (
             $validated['watering_mode'] === 'auto' &&
-            (
-                ! $latestReading ||
-                is_null($latestReading->soil_moisture)
-            )
+            (! $latestReading || is_null($latestReading->soil_moisture))
         ) {
             return back()->withErrors([
                 'watering_mode' => 'Auto mode requires a current soil moisture reading. Select schedule mode or reconnect the moisture sensor and send a valid reading first.',
@@ -135,14 +152,13 @@ class DeviceController extends Controller
         );
 
         return redirect()
-            ->route('devices.show', $device)
-            ->with('success', 'Device settings updated successfully.');
+            ->route('devices.automation', $device)
+            ->with('success', 'Automation settings updated successfully.');
     }
 
     public function waterNow(Request $request, Device $device): RedirectResponse
     {
         $this->authorizeDevice($device);
-
         $this->expireStalePendingCommands($device);
 
         if ($device->status !== 'active') {
@@ -221,7 +237,6 @@ class DeviceController extends Controller
     public function stopWatering(Device $device): RedirectResponse
     {
         $this->authorizeDevice($device);
-
         $this->expireStalePendingCommands($device);
 
         if ($device->status !== 'active') {
@@ -300,10 +315,5 @@ class DeviceController extends Controller
                     'notes' => 'Command expired before device confirmation.',
                 ]);
         }
-    }
-
-    private function getTimezoneOptions(): array
-    {
-        return timezone_identifiers_list();
     }
 }
