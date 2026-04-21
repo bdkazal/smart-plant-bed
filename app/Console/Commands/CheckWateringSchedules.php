@@ -88,7 +88,7 @@ class CheckWateringSchedules extends Command
                 'trigger_type' => 'schedule',
                 'duration_seconds' => (int) $schedule->duration_seconds,
                 'status' => 'requested',
-                'notes' => 'Scheduled watering triggered by Laravel scheduler.',
+                'notes' => 'Scheduled watering triggered by Laravel scheduler using device timezone: ' . $deviceTimezone . '.',
             ]);
 
             $createdCount++;

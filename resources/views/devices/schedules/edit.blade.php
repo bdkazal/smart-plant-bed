@@ -17,6 +17,9 @@
         <div class="rounded-lg bg-white p-6 shadow">
             <h1 class="mb-2 text-2xl font-bold">Edit Watering Schedule</h1>
             <p class="mb-6 text-gray-600">Device: {{ $device->name }}</p>
+            <p class="mb-6 text-gray-600">
+                Schedule timezone: <strong>{{ $device->timezone ?? 'Asia/Dhaka' }}</strong>
+            </p>
 
             @if ($errors->any())
             <div class="mb-6 rounded-lg bg-red-100 px-4 py-3 text-red-800">
@@ -54,6 +57,9 @@
                         value="{{ old('time_of_day', substr($schedule->time_of_day, 0, 5)) }}"
                         class="w-full rounded border px-3 py-2"
                         required>
+                    <p class="mt-2 text-sm text-gray-500">
+                        This schedule time will run in {{ $device->timezone ?? 'Asia/Dhaka' }}.
+                    </p>
                 </div>
 
                 <div>

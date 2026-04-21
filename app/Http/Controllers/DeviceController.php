@@ -75,12 +75,15 @@ class DeviceController extends Controller
             $manualWateringState = 'running';
         }
 
+        $timezoneOptions = $this->getTimezoneOptions();
+
         return view('devices.show', compact(
             'device',
             'latestReading',
             'manualMaxDuration',
             'latestActiveWateringLog',
-            'manualWateringState'
+            'manualWateringState',
+            'timezoneOptions'
         ));
     }
 
@@ -91,6 +94,7 @@ class DeviceController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100'],
             'location_label' => ['nullable', 'string', 'max:100'],
+            'timezone' => ['required', 'timezone'],
             'watering_mode' => ['required', 'in:auto,schedule'],
             'soil_moisture_threshold' => ['required', 'integer', 'min:0', 'max:100'],
             'max_watering_duration_seconds' => ['required', 'integer', 'min:1', 'max:300'],
@@ -115,6 +119,7 @@ class DeviceController extends Controller
         $device->update([
             'name' => $validated['name'],
             'location_label' => $validated['location_label'] ?: null,
+            'timezone' => $validated['timezone'],
         ]);
 
         $device->wateringRule()->updateOrCreate(
@@ -295,5 +300,10 @@ class DeviceController extends Controller
                     'notes' => 'Command expired before device confirmation.',
                 ]);
         }
+    }
+
+    private function getTimezoneOptions(): array
+    {
+        return timezone_identifiers_list();
     }
 }

@@ -111,6 +111,24 @@
                     </div>
                 </div>
 
+                <div>
+                    <label for="timezone" class="mb-1 block font-medium">Device Timezone</label>
+                    <select
+                        name="timezone"
+                        id="timezone"
+                        class="w-full rounded border px-3 py-2"
+                        required>
+                        @foreach ($timezoneOptions as $timezone)
+                        <option value="{{ $timezone }}" @selected(old('timezone', $device->timezone ?? 'Asia/Dhaka') === $timezone)>
+                            {{ $timezone }}
+                        </option>
+                        @endforeach
+                    </select>
+                    <p class="mt-2 text-sm text-gray-500">
+                        All schedule times will run using this device timezone.
+                    </p>
+                </div>
+
                 <div class="grid gap-6 md:grid-cols-2">
                     <div>
                         <label for="watering_mode" class="mb-1 block font-medium">Automation Mode</label>
@@ -307,7 +325,12 @@
                         class="rounded bg-blue-600 px-3 py-2 text-sm text-white hover:bg-blue-700">
                         Add Schedule
                     </a>
+
                 </div>
+                <p class="mb-4 text-sm text-gray-500">
+                    Schedule times below use device timezone:
+                    <strong>{{ $device->timezone ?? 'Asia/Dhaka' }}</strong>
+                </p>
 
                 @php
                 $days = [
