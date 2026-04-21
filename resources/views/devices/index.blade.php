@@ -4,30 +4,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Devices - Smart Plant Bed</title>
+    <title>My Devices - Smart Plant Bed</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 
 <body class="bg-gray-100 min-h-screen">
-    <div class="max-w-6xl mx-auto py-10 px-4">
-        <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <div class="max-w-5xl mx-auto py-8 px-4">
+        <div class="mb-6 flex items-center justify-between">
             <div>
-                <h1 class="text-3xl font-bold">Devices</h1>
-                <p class="text-gray-600">Manage your claimed devices and continue setup when needed.</p>
+                <h1 class="text-3xl font-bold">My Devices</h1>
+                <p class="mt-1 text-gray-600">Manage your connected smart devices.</p>
             </div>
 
-            <div class="flex items-center gap-3">
+            <div class="flex gap-2">
                 <a
                     href="{{ route('devices.add') }}"
-                    class="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
+                    class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
                     Add Device
                 </a>
 
-                <form action="{{ route('logout') }}" method="POST">
+                <form method="POST" action="/logout">
                     @csrf
                     <button
                         type="submit"
-                        class="rounded bg-gray-300 px-4 py-2 text-sm text-gray-900 hover:bg-gray-400">
+                        class="rounded bg-gray-700 px-4 py-2 text-white hover:bg-gray-800">
                         Logout
                     </button>
                 </form>
@@ -35,87 +35,50 @@
         </div>
 
         @if (session('success'))
-        <div class="mb-6 rounded-lg bg-green-100 px-4 py-3 text-green-800">
+        <div class="mb-4 rounded bg-green-100 px-4 py-3 text-green-800">
             {{ session('success') }}
         </div>
         @endif
 
         @if ($devices->isEmpty())
-        <div class="rounded-lg bg-white p-8 shadow">
+        <div class="rounded-lg bg-white p-6 shadow">
             <h2 class="text-xl font-semibold">No devices yet</h2>
             <p class="mt-2 text-gray-600">
-                You have not claimed any device yet. Add a device using your claim code or QR flow.
+                You have not added any devices yet. Start by claiming a device.
             </p>
 
-            <div class="mt-5">
-                <a
-                    href="{{ route('devices.add') }}"
-                    class="inline-flex items-center rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
-                    Add Your First Device
-                </a>
-            </div>
+            <a
+                href="{{ route('devices.add') }}"
+                class="mt-4 inline-flex rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+                Add Your First Device
+            </a>
         </div>
         @else
-        <div class="overflow-hidden rounded-lg bg-white shadow">
-            <table class="min-w-full">
-                <thead class="bg-gray-200">
-                    <tr>
-                        <th class="px-4 py-3 text-left">ID</th>
-                        <th class="px-4 py-3 text-left">Name</th>
-                        <th class="px-4 py-3 text-left">UUID</th>
-                        <th class="px-4 py-3 text-left">Status</th>
-                        <th class="px-4 py-3 text-left">Location</th>
-                        <th class="px-4 py-3 text-left">Firmware</th>
-                        <th class="px-4 py-3 text-left">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($devices as $device)
-                    <tr class="border-t align-top">
-                        <td class="px-4 py-3">{{ $device->id }}</td>
+        <div class="grid gap-4 md:grid-cols-2">
+            @foreach ($devices as $device)
+            <a
+                href="{{ route('devices.show', $device) }}"
+                class="block rounded-lg bg-white p-5 shadow hover:bg-gray-50">
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <h2 class="text-xl font-semibold">{{ $device->name }}</h2>
+                        <p class="mt-1 text-sm text-gray-500">
+                            {{ $device->displayType() }}
+                        </p>
+                    </div>
 
-                        <td class="px-4 py-3">
-                            <a href="{{ route('devices.show', $device) }}" class="text-blue-600 hover:underline">
-                                {{ $device->name }}
-                            </a>
-                        </td>
+                    <span class="rounded bg-gray-100 px-3 py-1 text-sm text-gray-700">
+                        {{ ucfirst(str_replace('_', ' ', $device->status)) }}
+                    </span>
+                </div>
 
-                        <td class="px-4 py-3 text-sm text-gray-600">{{ $device->uuid }}</td>
-
-                        <td class="px-4 py-3">
-                            <div>{{ ucfirst(str_replace('_', ' ', $device->status)) }}</div>
-
-                            @if ($device->status === 'claimed_pending_wifi')
-                            <div class="mt-1 text-sm text-yellow-700">
-                                Waiting for Wi-Fi setup
-                            </div>
-                            @endif
-                        </td>
-
-                        <td class="px-4 py-3">{{ $device->location_label ?? 'N/A' }}</td>
-                        <td class="px-4 py-3">{{ $device->firmware_version ?? 'N/A' }}</td>
-
-                        <td class="px-4 py-3">
-                            <div class="flex flex-col gap-2">
-                                <a
-                                    href="{{ route('devices.show', $device) }}"
-                                    class="text-blue-600 hover:underline">
-                                    View Device
-                                </a>
-
-                                @if ($device->status === 'claimed_pending_wifi')
-                                <a
-                                    href="{{ route('devices.setup', $device) }}"
-                                    class="text-yellow-700 hover:underline">
-                                    Continue Setup
-                                </a>
-                                @endif
-                            </div>
-                        </td>
-                    </tr>
-                    @endforeach
-                </tbody>
-            </table>
+                <div class="mt-4 space-y-1 text-sm text-gray-700">
+                    <p><strong>Location:</strong> {{ $device->location_label ?? 'N/A' }}</p>
+                    <p><strong>Timezone:</strong> {{ $device->timezone ?? 'Asia/Dhaka' }}</p>
+                    <p><strong>Last Seen:</strong> {{ $device->last_seen_at?->diffForHumans() ?? 'Never' }}</p>
+                </div>
+            </a>
+            @endforeach
         </div>
         @endif
     </div>

@@ -34,20 +34,39 @@ class DeviceController extends Controller
         ]);
 
         $latestReading = $device->sensorReadings->first();
+
         $latestActiveWateringLog = $device->wateringLogs()
-            ->whereIn('status', ['requested', 'running'])
+            ->where(function ($query) {
+                $query->where('status', 'requested')
+                    ->orWhere(function ($subQuery) {
+                        $subQuery->where('status', 'running')
+                            ->whereNull('ended_at');
+                    });
+            })
             ->latest('id')
             ->first();
 
         $activeValveOnCommand = DeviceCommand::where('device_id', $device->id)
             ->where('command_type', 'valve_on')
-            ->whereIn('status', ['pending', 'acknowledged'])
+            ->where(function ($query) {
+                $query->where('status', 'pending')
+                    ->orWhere(function ($subQuery) {
+                        $subQuery->where('status', 'acknowledged')
+                            ->whereNull('executed_at');
+                    });
+            })
             ->latest('id')
             ->first();
 
         $activeValveOffCommand = DeviceCommand::where('device_id', $device->id)
             ->where('command_type', 'valve_off')
-            ->whereIn('status', ['pending', 'acknowledged'])
+            ->where(function ($query) {
+                $query->where('status', 'pending')
+                    ->orWhere(function ($subQuery) {
+                        $subQuery->where('status', 'acknowledged')
+                            ->whereNull('executed_at');
+                    });
+            })
             ->latest('id')
             ->first();
 
@@ -73,7 +92,6 @@ class DeviceController extends Controller
             'enabledScheduleCount'
         ));
     }
-
     public function automation(Device $device): View
     {
         $this->authorizeDevice($device);
