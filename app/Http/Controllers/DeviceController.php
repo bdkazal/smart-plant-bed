@@ -122,11 +122,11 @@ class DeviceController extends Controller
 
         $wateringLogs = WateringLog::where('device_id', $device->id)
             ->latest()
-            ->paginate(20, ['*'], 'logs_page');
+            ->paginate(5, ['*'], 'logs_page');
 
         $deviceCommands = DeviceCommand::where('device_id', $device->id)
             ->latest()
-            ->paginate(20, ['*'], 'commands_page');
+            ->paginate(5, ['*'], 'commands_page');
 
         return view('devices.history', compact(
             'device',
