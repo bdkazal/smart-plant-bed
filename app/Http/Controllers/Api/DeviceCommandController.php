@@ -93,6 +93,32 @@ class DeviceCommandController extends Controller
             ], 403);
         }
 
+        if (in_array($command->status, ['expired', 'failed', 'executed'], true)) {
+            return response()->json([
+                'message' => 'Command is already closed and cannot be updated.',
+                'command_id' => $command->id,
+                'status' => $command->status,
+            ], 409);
+        }
+
+        if ($command->status === 'pending' && ! in_array($validated['status'], ['acknowledged', 'failed'], true)) {
+            return response()->json([
+                'message' => 'Pending command must be acknowledged or failed before it can be executed.',
+                'command_id' => $command->id,
+                'current_status' => $command->status,
+                'requested_status' => $validated['status'],
+            ], 409);
+        }
+
+        if ($command->status === 'acknowledged' && ! in_array($validated['status'], ['executed', 'failed'], true)) {
+            return response()->json([
+                'message' => 'Acknowledged command can only be executed or failed.',
+                'command_id' => $command->id,
+                'current_status' => $command->status,
+                'requested_status' => $validated['status'],
+            ], 409);
+        }
+
         $log = $command->wateringLogs()->latest()->first();
 
         if ($validated['status'] === 'acknowledged') {
