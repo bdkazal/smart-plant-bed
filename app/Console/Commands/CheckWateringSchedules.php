@@ -48,8 +48,7 @@ class CheckWateringSchedules extends Command
                 continue;
             }
 
-            $this->expireStalePendingCommands($device);
-
+            $this->cleanupStaleCommands($device);
             $deviceTimezone = $device->timezone ?: 'Asia/Dhaka';
             $deviceNow = Carbon::now($deviceTimezone);
 

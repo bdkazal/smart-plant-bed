@@ -35,7 +35,7 @@ class DeviceCommandController extends Controller
             ], 401);
         }
 
-        $this->expireStalePendingCommands($device);
+        $this->cleanupStaleCommands($device);
 
         $command = $device->deviceCommands()
             ->where('status', 'pending')
@@ -101,6 +101,13 @@ class DeviceCommandController extends Controller
                 'acknowledged_at' => $command->acknowledged_at ?? now(),
             ]);
 
+            if ($command->command_type === 'valve_on' && $log) {
+                $log->update([
+                    'status' => 'running',
+                    'started_at' => $log->started_at ?? now(),
+                ]);
+            }
+
             if ($command->command_type === 'valve_off') {
                 $activeLog = WateringLog::where('device_id', $device->id)
                     ->whereIn('status', ['requested', 'running'])
@@ -112,13 +119,6 @@ class DeviceCommandController extends Controller
                         'notes' => trim(($activeLog->notes ? $activeLog->notes . ' ' : '') . 'Stop request acknowledged by device.'),
                     ]);
                 }
-            }
-
-            if ($command->command_type === 'valve_on' && $log) {
-                $log->update([
-                    'status' => 'running',
-                    'started_at' => $log->started_at ?? now(),
-                ]);
             }
         }
 
@@ -171,6 +171,7 @@ class DeviceCommandController extends Controller
             if ($log) {
                 $log->update([
                     'status' => 'failed',
+                    'ended_at' => now(),
                     'notes' => $validated['message'] ?? $log->notes,
                 ]);
             }
@@ -183,24 +184,79 @@ class DeviceCommandController extends Controller
         ]);
     }
 
-    private function expireStalePendingCommands(Device $device): void
+    private function cleanupStaleCommands(Device $device): void
     {
-        $expiredCommands = DeviceCommand::where('device_id', $device->id)
+        $expiredPendingCommands = DeviceCommand::where('device_id', $device->id)
             ->where('status', 'pending')
             ->where('issued_at', '<', now()->subMinute())
             ->get();
 
-        foreach ($expiredCommands as $expiredCommand) {
-            $expiredCommand->update([
+        foreach ($expiredPendingCommands as $command) {
+            $command->update([
                 'status' => 'expired',
             ]);
 
-            WateringLog::where('device_command_id', $expiredCommand->id)
+            WateringLog::where('device_command_id', $command->id)
                 ->where('status', 'requested')
                 ->update([
                     'status' => 'failed',
+                    'ended_at' => now(),
                     'notes' => 'Command expired before device confirmation.',
                 ]);
+        }
+
+        $acknowledgedCommands = DeviceCommand::where('device_id', $device->id)
+            ->where('status', 'acknowledged')
+            ->get();
+
+        foreach ($acknowledgedCommands as $command) {
+            $timedOut = false;
+
+            if ($command->command_type === 'valve_on') {
+                $durationSeconds = (int) data_get($command->payload, 'duration_seconds', 0);
+                $timeoutSeconds = max($durationSeconds, 0) + 60;
+
+                $timedOut = $command->acknowledged_at
+                    && $command->acknowledged_at->copy()->addSeconds($timeoutSeconds)->isPast();
+            }
+
+            if ($command->command_type === 'valve_off') {
+                $timedOut = $command->acknowledged_at
+                    && $command->acknowledged_at->copy()->addSeconds(60)->isPast();
+            }
+
+            if (! $timedOut) {
+                continue;
+            }
+
+            $command->update([
+                'status' => 'failed',
+            ]);
+
+            $log = WateringLog::where('device_command_id', $command->id)->latest('id')->first();
+
+            if ($log && in_array($log->status, ['requested', 'running'], true)) {
+                $log->update([
+                    'status' => 'failed',
+                    'ended_at' => now(),
+                    'notes' => trim(($log->notes ? $log->notes . ' ' : '') . 'Device acknowledged command but no completion was received before timeout.'),
+                ]);
+            }
+
+            if ($command->command_type === 'valve_off') {
+                $activeLog = WateringLog::where('device_id', $device->id)
+                    ->whereIn('status', ['requested', 'running'])
+                    ->latest('id')
+                    ->first();
+
+                if ($activeLog) {
+                    $activeLog->update([
+                        'status' => 'failed',
+                        'ended_at' => now(),
+                        'notes' => trim(($activeLog->notes ? $activeLog->notes . ' ' : '') . 'Stop command timed out before completion.'),
+                    ]);
+                }
+            }
         }
     }
 }

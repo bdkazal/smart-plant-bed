@@ -47,7 +47,7 @@
                 <p><strong>Location:</strong> {{ $device->location_label ?? 'N/A' }}</p>
                 <p><strong>Timezone:</strong> {{ $device->timezone ?? 'Asia/Dhaka' }}</p>
                 <p><strong>Mode:</strong> {{ ucfirst($device->wateringRule?->watering_mode ?? 'schedule') }}</p>
-                <p><strong>Enabled Schedules:</strong> {{ $enabledScheduleCount }}</p>
+                <p><strong>Enabled Schedules:</strong> {{ $device->wateringSchedules->count() }}</p>
                 <p><strong>Last Seen:</strong> {{ $device->last_seen_at?->diffForHumans() ?? 'Never' }}</p>
             </div>
 
@@ -77,7 +77,9 @@
 
             <form action="{{ route('devices.water-stop', $device) }}" method="POST">
                 @csrf
-                <button type="submit" class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700">Stop Watering</button>
+                <button type="submit" class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700">
+                    Stop Watering
+                </button>
             </form>
             @elseif ($manualWateringState === 'running')
             <div class="mb-4 rounded border border-green-300 bg-green-50 px-4 py-3 text-green-800">
@@ -89,7 +91,9 @@
 
             <form action="{{ route('devices.water-stop', $device) }}" method="POST">
                 @csrf
-                <button type="submit" class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700">Stop Watering</button>
+                <button type="submit" class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700">
+                    Stop Watering
+                </button>
             </form>
             @elseif ($manualWateringState === 'stopping')
             <div class="rounded border border-gray-300 bg-gray-50 px-4 py-3 text-gray-800">

@@ -25,48 +25,43 @@ class DeviceController extends Controller
     public function show(Device $device): View
     {
         $this->authorizeDevice($device);
-        $this->expireStalePendingCommands($device);
+
+        $this->cleanupStaleCommands($device);
+
+        $today = now($device->timezone ?? config('app.timezone'))->dayOfWeekIso;
 
         $device->load([
             'wateringRule',
-            'sensorReadings' => fn($query) => $query->latest()->limit(1),
-            'wateringSchedules' => fn($query) => $query->where('is_enabled', true)->orderBy('day_of_week')->orderBy('time_of_day'),
+            'wateringSchedules' => fn($query) => $query
+                ->orderByRaw("
+                CASE
+                    WHEN day_of_week >= ? THEN day_of_week - ?
+                    ELSE day_of_week + 7 - ?
+                END
+            ", [$today, $today, $today])
+                ->orderBy('time_of_day'),
+            'sensorReadings' => fn($query) => $query->latest()->limit(5),
+            'wateringLogs' => fn($query) => $query->latest()->limit(5),
+            'deviceCommands' => fn($query) => $query->latest()->limit(5),
         ]);
 
         $latestReading = $device->sensorReadings->first();
-
-        $latestActiveWateringLog = $device->wateringLogs()
-            ->where(function ($query) {
-                $query->where('status', 'requested')
-                    ->orWhere(function ($subQuery) {
-                        $subQuery->where('status', 'running')
-                            ->whereNull('ended_at');
-                    });
-            })
-            ->latest('id')
-            ->first();
+        $manualMaxDuration = $device->wateringRule?->max_watering_duration_seconds ?? 300;
 
         $activeValveOnCommand = DeviceCommand::where('device_id', $device->id)
             ->where('command_type', 'valve_on')
-            ->where(function ($query) {
-                $query->where('status', 'pending')
-                    ->orWhere(function ($subQuery) {
-                        $subQuery->where('status', 'acknowledged')
-                            ->whereNull('executed_at');
-                    });
-            })
+            ->whereIn('status', ['pending', 'acknowledged'])
             ->latest('id')
             ->first();
 
         $activeValveOffCommand = DeviceCommand::where('device_id', $device->id)
             ->where('command_type', 'valve_off')
-            ->where(function ($query) {
-                $query->where('status', 'pending')
-                    ->orWhere(function ($subQuery) {
-                        $subQuery->where('status', 'acknowledged')
-                            ->whereNull('executed_at');
-                    });
-            })
+            ->whereIn('status', ['pending', 'acknowledged'])
+            ->latest('id')
+            ->first();
+
+        $latestActiveWateringLog = $device->wateringLogs()
+            ->whereIn('status', ['requested', 'running'])
             ->latest('id')
             ->first();
 
@@ -80,49 +75,16 @@ class DeviceController extends Controller
             $manualWateringState = 'running';
         }
 
-        $manualMaxDuration = $device->wateringRule?->max_watering_duration_seconds ?? 300;
-        $enabledScheduleCount = $device->wateringSchedules->count();
+        $timezoneOptions = $this->getTimezoneOptions();
 
         return view('devices.show', compact(
             'device',
             'latestReading',
+            'manualMaxDuration',
             'latestActiveWateringLog',
             'manualWateringState',
-            'manualMaxDuration',
-            'enabledScheduleCount'
-        ));
-    }
-    public function automation(Device $device): View
-    {
-        $this->authorizeDevice($device);
-        $this->expireStalePendingCommands($device);
-
-        $device->load([
-            'wateringRule',
-            'sensorReadings' => fn($query) => $query->latest()->limit(1),
-        ]);
-
-        $latestReading = $device->sensorReadings->first();
-        $timezoneOptions = timezone_identifiers_list();
-
-        return view('devices.automation', compact(
-            'device',
-            'latestReading',
             'timezoneOptions'
         ));
-    }
-
-    public function history(Device $device): View
-    {
-        $this->authorizeDevice($device);
-        $this->expireStalePendingCommands($device);
-
-        $device->load([
-            'wateringLogs' => fn($query) => $query->latest()->limit(20),
-            'deviceCommands' => fn($query) => $query->latest()->limit(20),
-        ]);
-
-        return view('devices.history', compact('device'));
     }
 
     public function updateSettings(Request $request, Device $device): RedirectResponse
@@ -144,7 +106,10 @@ class DeviceController extends Controller
 
         if (
             $validated['watering_mode'] === 'auto' &&
-            (! $latestReading || is_null($latestReading->soil_moisture))
+            (
+                ! $latestReading ||
+                is_null($latestReading->soil_moisture)
+            )
         ) {
             return back()->withErrors([
                 'watering_mode' => 'Auto mode requires a current soil moisture reading. Select schedule mode or reconnect the moisture sensor and send a valid reading first.',
@@ -170,14 +135,15 @@ class DeviceController extends Controller
         );
 
         return redirect()
-            ->route('devices.automation', $device)
-            ->with('success', 'Automation settings updated successfully.');
+            ->route('devices.show', $device)
+            ->with('success', 'Device settings updated successfully.');
     }
 
     public function waterNow(Request $request, Device $device): RedirectResponse
     {
         $this->authorizeDevice($device);
-        $this->expireStalePendingCommands($device);
+
+        $this->cleanupStaleCommands($device);
 
         if ($device->status !== 'active') {
             return redirect()
@@ -255,7 +221,8 @@ class DeviceController extends Controller
     public function stopWatering(Device $device): RedirectResponse
     {
         $this->authorizeDevice($device);
-        $this->expireStalePendingCommands($device);
+
+        $this->cleanupStaleCommands($device);
 
         if ($device->status !== 'active') {
             return redirect()
@@ -314,24 +281,69 @@ class DeviceController extends Controller
         }
     }
 
-    private function expireStalePendingCommands(Device $device): void
+    private function cleanupStaleCommands(Device $device): void
     {
-        $expiredCommands = DeviceCommand::where('device_id', $device->id)
+        $expiredPendingCommands = DeviceCommand::where('device_id', $device->id)
             ->where('status', 'pending')
             ->where('issued_at', '<', now()->subMinute())
             ->get();
 
-        foreach ($expiredCommands as $expiredCommand) {
-            $expiredCommand->update([
+        foreach ($expiredPendingCommands as $command) {
+            $command->update([
                 'status' => 'expired',
             ]);
 
-            WateringLog::where('device_command_id', $expiredCommand->id)
+            WateringLog::where('device_command_id', $command->id)
                 ->where('status', 'requested')
                 ->update([
                     'status' => 'failed',
+                    'ended_at' => now(),
                     'notes' => 'Command expired before device confirmation.',
                 ]);
         }
+
+        $acknowledgedCommands = DeviceCommand::where('device_id', $device->id)
+            ->where('status', 'acknowledged')
+            ->get();
+
+        foreach ($acknowledgedCommands as $command) {
+            $timedOut = false;
+
+            if ($command->command_type === 'valve_on') {
+                $durationSeconds = (int) data_get($command->payload, 'duration_seconds', 0);
+                $timeoutSeconds = max($durationSeconds, 0) + 60;
+
+                $timedOut = $command->acknowledged_at
+                    && $command->acknowledged_at->copy()->addSeconds($timeoutSeconds)->isPast();
+            }
+
+            if ($command->command_type === 'valve_off') {
+                $timedOut = $command->acknowledged_at
+                    && $command->acknowledged_at->copy()->addSeconds(60)->isPast();
+            }
+
+            if (! $timedOut) {
+                continue;
+            }
+
+            $command->update([
+                'status' => 'failed',
+            ]);
+
+            $log = WateringLog::where('device_command_id', $command->id)->latest('id')->first();
+
+            if ($log && in_array($log->status, ['requested', 'running'], true)) {
+                $log->update([
+                    'status' => 'failed',
+                    'ended_at' => now(),
+                    'notes' => trim(($log->notes ? $log->notes . ' ' : '') . 'Device acknowledged command but no completion was received before timeout.'),
+                ]);
+            }
+        }
+    }
+
+    private function getTimezoneOptions(): array
+    {
+        return timezone_identifiers_list();
     }
 }
