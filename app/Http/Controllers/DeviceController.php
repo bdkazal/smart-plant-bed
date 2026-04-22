@@ -33,12 +33,13 @@ class DeviceController extends Controller
         $device->load([
             'wateringRule',
             'wateringSchedules' => fn($query) => $query
+                ->where('is_enabled', true)
                 ->orderByRaw("
-                CASE
-                    WHEN day_of_week >= ? THEN day_of_week - ?
-                    ELSE day_of_week + 7 - ?
-                END
-            ", [$today, $today, $today])
+                    CASE
+                        WHEN day_of_week >= ? THEN day_of_week - ?
+                        ELSE day_of_week + 7 - ?
+                    END
+                ", [$today, $today, $today])
                 ->orderBy('time_of_day'),
             'sensorReadings' => fn($query) => $query->latest()->limit(5),
             'wateringLogs' => fn($query) => $query->latest()->limit(5),
@@ -75,15 +76,62 @@ class DeviceController extends Controller
             $manualWateringState = 'running';
         }
 
-        $timezoneOptions = $this->getTimezoneOptions();
+        $enabledScheduleCount = $device->wateringSchedules->count();
 
         return view('devices.show', compact(
             'device',
             'latestReading',
-            'manualMaxDuration',
             'latestActiveWateringLog',
             'manualWateringState',
-            'timezoneOptions'
+            'manualMaxDuration',
+            'enabledScheduleCount'
+        ));
+    }
+
+    public function automation(Device $device): View
+    {
+        $this->authorizeDevice($device);
+
+        $this->cleanupStaleCommands($device);
+
+        $device->load([
+            'wateringRule',
+            'sensorReadings' => fn($query) => $query->latest()->limit(5),
+            'wateringSchedules' => fn($query) => $query
+                ->orderBy('day_of_week')
+                ->orderBy('time_of_day'),
+        ]);
+
+        $latestReading = $device->sensorReadings->first();
+        $timezoneOptions = $this->getTimezoneOptions();
+        $enabledScheduleCount = $device->wateringSchedules->where('is_enabled', true)->count();
+
+        return view('devices.automation', compact(
+            'device',
+            'latestReading',
+            'timezoneOptions',
+            'enabledScheduleCount'
+        ));
+    }
+
+    public function history(Device $device): View
+    {
+        $this->authorizeDevice($device);
+
+        $this->cleanupStaleCommands($device);
+
+        $wateringLogs = WateringLog::where('device_id', $device->id)
+            ->latest()
+            ->paginate(20, ['*'], 'logs_page');
+
+        $deviceCommands = DeviceCommand::where('device_id', $device->id)
+            ->latest()
+            ->paginate(20, ['*'], 'commands_page');
+
+        return view('devices.history', compact(
+            'device',
+            'wateringLogs',
+            'deviceCommands'
         ));
     }
 
