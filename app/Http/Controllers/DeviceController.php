@@ -104,6 +104,11 @@ class DeviceController extends Controller
 
         $manualWateringState = $this->resolveManualWateringState($activeValveOnCommand, $activeValveOffCommand);
 
+        $latestActiveWateringLog = WateringLog::where('device_id', $device->id)
+            ->whereIn('status', ['requested', 'running'])
+            ->latest('id')
+            ->first();
+
         return response()->json([
             'device' => [
                 'id' => $device->id,
@@ -130,6 +135,10 @@ class DeviceController extends Controller
                 'state_label' => $this->manualStateLabel($manualWateringState),
                 'max_duration' => $device->wateringRule?->max_watering_duration_seconds ?? 300,
                 'available' => $this->isDeviceOnline($device),
+            ],
+            'active_log' => [
+                'trigger_type' => $latestActiveWateringLog?->trigger_type,
+                'trigger_label' => $latestActiveWateringLog ? ucfirst($latestActiveWateringLog->trigger_type) : null,
             ],
         ]);
     }
