@@ -24,6 +24,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/devices/{device}/setup', [DeviceClaimController::class, 'setup'])->name('devices.setup');
 
     Route::get('/devices/{device}', [DeviceController::class, 'show'])->name('devices.show');
+    Route::get('/devices/{device}/status', [DeviceController::class, 'status'])->name('devices.status');
     Route::get('/devices/{device}/automation', [DeviceController::class, 'automation'])->name('devices.automation');
     Route::get('/devices/{device}/history', [DeviceController::class, 'history'])->name('devices.history');
 

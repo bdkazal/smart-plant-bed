@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Device;
 use App\Models\DeviceCommand;
 use App\Models\WateringLog;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -66,16 +67,7 @@ class DeviceController extends Controller
             ->latest('id')
             ->first();
 
-        $manualWateringState = 'idle';
-
-        if ($activeValveOffCommand) {
-            $manualWateringState = 'stopping';
-        } elseif ($activeValveOnCommand?->status === 'pending') {
-            $manualWateringState = 'pending';
-        } elseif ($activeValveOnCommand?->status === 'acknowledged') {
-            $manualWateringState = 'running';
-        }
-
+        $manualWateringState = $this->resolveManualWateringState($activeValveOnCommand, $activeValveOffCommand);
         $enabledScheduleCount = $device->wateringSchedules->count();
 
         return view('devices.show', compact(
@@ -86,6 +78,72 @@ class DeviceController extends Controller
             'manualMaxDuration',
             'enabledScheduleCount'
         ));
+    }
+
+    public function status(Device $device): JsonResponse
+    {
+        $this->authorizeDevice($device);
+
+        $this->cleanupStaleCommands($device);
+
+        $device->load([
+            'wateringRule',
+            'wateringSchedules' => fn($query) => $query->where('is_enabled', true),
+            'sensorReadings' => fn($query) => $query->latest()->limit(1),
+        ]);
+
+        $latestReading = $device->sensorReadings->first();
+
+        $activeValveOnCommand = DeviceCommand::where('device_id', $device->id)
+            ->where('command_type', 'valve_on')
+            ->whereIn('status', ['pending', 'acknowledged'])
+            ->latest('id')
+            ->first();
+
+        $activeValveOffCommand = DeviceCommand::where('device_id', $device->id)
+            ->where('command_type', 'valve_off')
+            ->whereIn('status', ['pending', 'acknowledged'])
+            ->latest('id')
+            ->first();
+
+        $latestActiveWateringLog = WateringLog::where('device_id', $device->id)
+            ->whereIn('status', ['requested', 'running'])
+            ->latest('id')
+            ->first();
+
+        $manualWateringState = $this->resolveManualWateringState($activeValveOnCommand, $activeValveOffCommand);
+
+        return response()->json([
+            'device' => [
+                'id' => $device->id,
+                'name' => $device->name,
+                'display_type' => $device->displayType(),
+                'status' => $device->status,
+                'status_label' => ucfirst(str_replace('_', ' ', $device->status)),
+                'location_label' => $device->location_label ?? 'N/A',
+                'timezone' => $device->timezone ?? 'Asia/Dhaka',
+                'mode' => $device->wateringRule?->watering_mode ?? 'schedule',
+                'mode_label' => ucfirst($device->wateringRule?->watering_mode ?? 'schedule'),
+                'enabled_schedule_count' => $device->wateringSchedules->count(),
+                'last_seen_human' => $device->last_seen_at?->diffForHumans() ?? 'Never',
+                'is_online' => $device->last_seen_at?->gt(now()->subMinutes(2)) ?? false,
+            ],
+            'latest_reading' => [
+                'temperature' => $latestReading?->temperature,
+                'humidity' => $latestReading?->humidity,
+                'soil_moisture' => $latestReading?->soil_moisture,
+                'recorded_at' => $latestReading?->recorded_at?->format('Y-m-d H:i:s'),
+            ],
+            'manual' => [
+                'state' => $manualWateringState,
+                'state_label' => $this->manualStateLabel($manualWateringState),
+                'max_duration' => $device->wateringRule?->max_watering_duration_seconds ?? 300,
+            ],
+            'active_log' => [
+                'trigger_type' => $latestActiveWateringLog?->trigger_type,
+                'trigger_label' => $latestActiveWateringLog ? ucfirst($latestActiveWateringLog->trigger_type) : null,
+            ],
+        ]);
     }
 
     public function automation(Device $device): View
@@ -327,6 +385,33 @@ class DeviceController extends Controller
         if (! $user || $device->user_id !== $user->id) {
             abort(403);
         }
+    }
+
+    private function resolveManualWateringState(?DeviceCommand $activeValveOnCommand, ?DeviceCommand $activeValveOffCommand): string
+    {
+        if ($activeValveOffCommand) {
+            return 'stopping';
+        }
+
+        if ($activeValveOnCommand?->status === 'pending') {
+            return 'pending';
+        }
+
+        if ($activeValveOnCommand?->status === 'acknowledged') {
+            return 'running';
+        }
+
+        return 'idle';
+    }
+
+    private function manualStateLabel(string $state): string
+    {
+        return match ($state) {
+            'pending' => 'Waiting for device confirmation',
+            'running' => 'Watering in progress',
+            'stopping' => 'Stop request pending',
+            default => 'Idle',
+        };
     }
 
     private function cleanupStaleCommands(Device $device): void
