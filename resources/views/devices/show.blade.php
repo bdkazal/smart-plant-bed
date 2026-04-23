@@ -39,8 +39,8 @@
 
         <div class="mb-6 flex items-center justify-between gap-4">
             <h1 id="device-name" class="text-2xl font-bold">{{ $device->name }}</h1>
-            <div id="online-badge" class="rounded-full px-3 py-1 text-sm {{ ($device->last_seen_at?->gt(now()->subMinutes(2)) ?? false) ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700' }}">
-                {{ ($device->last_seen_at?->gt(now()->subMinutes(2)) ?? false) ? 'Online' : 'Offline' }}
+            <div id="online-badge" class="rounded-full px-3 py-1 text-sm {{ $isOnline ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700' }}">
+                {{ $isOnline ? 'Online' : 'Offline' }}
             </div>
         </div>
 
@@ -48,7 +48,7 @@
             <div class="rounded-lg bg-white p-5 shadow">
                 <h2 class="mb-3 text-lg font-semibold">Device Status</h2>
                 <p><strong>Type:</strong> <span id="device-type">{{ $device->displayType() }}</span></p>
-                <p><strong>Status:</strong> <span id="device-status">{{ ucfirst(str_replace('_', ' ', $device->status)) }}</span></p>
+                <p><strong>Status:</strong> <span id="device-status">{{ $isOnline ? 'Online' : 'Offline' }}</span></p>
                 <p><strong>Location:</strong> <span id="device-location">{{ $device->location_label ?? 'N/A' }}</span></p>
                 <p><strong>Timezone:</strong> <span id="device-timezone">{{ $device->timezone ?? 'Asia/Dhaka' }}</span></p>
                 <p><strong>Mode:</strong> <span id="device-mode">{{ ucfirst($device->wateringRule?->watering_mode ?? 'schedule') }}</span></p>
@@ -68,39 +68,18 @@
         <div class="mt-4 rounded-lg bg-white p-5 shadow">
             <h2 class="mb-3 text-lg font-semibold">Watering Control</h2>
 
-            <div id="manual-state-box">
-                @if ($manualWateringState === 'pending')
-                <div class="mb-4 rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-800">
-                    <div id="manual-state-text">Watering request is waiting for device confirmation.</div>
-                    @if ($latestActiveWateringLog)
-                    <div id="manual-trigger-text" class="mt-1 text-sm">Trigger: {{ ucfirst($latestActiveWateringLog->trigger_type) }}</div>
-                    @else
-                    <div id="manual-trigger-text" class="mt-1 text-sm hidden"></div>
-                    @endif
+            <div class="mb-4 rounded border border-gray-300 bg-gray-50 px-4 py-3 text-gray-800">
+                <div><strong>Watering State:</strong> <span id="manual-state-text">{{ ucfirst($manualWateringState) }}</span></div>
+                <div id="started-by-row" class="{{ in_array($manualWateringState, ['waiting', 'watering', 'stopping'], true) ? '' : 'hidden' }}">
+                    <strong>Started By:</strong> <span id="started-by-text">N/A</span>
                 </div>
-                @elseif ($manualWateringState === 'running')
-                <div class="mb-4 rounded border border-green-300 bg-green-50 px-4 py-3 text-green-800">
-                    <div id="manual-state-text">Watering is currently in progress.</div>
-                    @if ($latestActiveWateringLog)
-                    <div id="manual-trigger-text" class="mt-1 text-sm">Trigger: {{ ucfirst($latestActiveWateringLog->trigger_type) }}</div>
-                    @else
-                    <div id="manual-trigger-text" class="mt-1 text-sm hidden"></div>
-                    @endif
-                </div>
-                @elseif ($manualWateringState === 'stopping')
-                <div class="mb-4 rounded border border-gray-300 bg-gray-50 px-4 py-3 text-gray-800">
-                    <div id="manual-state-text">Stop request is waiting for device confirmation.</div>
-                    <div id="manual-trigger-text" class="mt-1 text-sm hidden"></div>
-                </div>
-                @else
-                <div class="mb-4 rounded border border-gray-300 bg-gray-50 px-4 py-3 text-gray-800">
-                    <div id="manual-state-text">Device is idle.</div>
-                    <div id="manual-trigger-text" class="mt-1 text-sm hidden"></div>
-                </div>
-                @endif
             </div>
 
-            <div id="start-form-wrapper" class="{{ $manualWateringState === 'idle' ? '' : 'hidden' }}">
+            <div id="manual-offline-note" class="{{ $isOnline ? 'hidden' : '' }} mb-4 rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-800">
+                Device is offline. Manual watering is unavailable right now.
+            </div>
+
+            <div id="start-form-wrapper" class="{{ $manualWateringState === 'idle' && $isOnline ? '' : 'hidden' }}">
                 <form action="{{ route('devices.water-now', $device) }}" method="POST" class="space-y-4">
                     @csrf
                     <div>
@@ -125,19 +104,13 @@
                 </form>
             </div>
 
-            <div id="stop-form-wrapper" class="{{ in_array($manualWateringState, ['pending', 'running'], true) ? '' : 'hidden' }}">
+            <div id="stop-form-wrapper" class="{{ in_array($manualWateringState, ['waiting', 'watering'], true) && $isOnline ? '' : 'hidden' }}">
                 <form action="{{ route('devices.water-stop', $device) }}" method="POST">
                     @csrf
                     <button type="submit" class="rounded bg-red-600 px-4 py-2 text-white hover:bg-red-700">
                         Stop Watering
                     </button>
                 </form>
-            </div>
-
-            <div id="stopping-wrapper" class="{{ $manualWateringState === 'stopping' ? '' : 'hidden' }}">
-                <div class="rounded border border-gray-300 bg-gray-50 px-4 py-3 text-gray-800">
-                    Stop request is waiting for device confirmation.
-                </div>
             </div>
         </div>
 
@@ -170,37 +143,43 @@
 
         function updateManualState(data) {
             const state = data.manual.state;
+            const isOnline = data.device.is_online;
+
             const stateText = document.getElementById('manual-state-text');
-            const triggerText = document.getElementById('manual-trigger-text');
             const startWrapper = document.getElementById('start-form-wrapper');
             const stopWrapper = document.getElementById('stop-form-wrapper');
-            const stoppingWrapper = document.getElementById('stopping-wrapper');
+            const offlineNote = document.getElementById('manual-offline-note');
+            const startedByRow = document.getElementById('started-by-row');
+            const startedByText = document.getElementById('started-by-text');
 
             if (stateText) {
-                if (state === 'pending') {
-                    stateText.textContent = 'Watering request is waiting for device confirmation.';
-                } else if (state === 'running') {
-                    stateText.textContent = 'Watering is currently in progress.';
+                if (state === 'waiting') {
+                    stateText.textContent = 'Waiting';
+                } else if (state === 'watering') {
+                    stateText.textContent = 'Watering';
                 } else if (state === 'stopping') {
-                    stateText.textContent = 'Stop request is waiting for device confirmation.';
+                    stateText.textContent = 'Stopping';
                 } else {
-                    stateText.textContent = 'Device is idle.';
+                    stateText.textContent = 'Idle';
                 }
             }
 
-            if (triggerText) {
-                if (['pending', 'running', 'stopping'].includes(state) && data.active_log.trigger_label) {
-                    triggerText.textContent = 'Trigger: ' + data.active_log.trigger_label;
-                    triggerText.classList.remove('hidden');
+            if (startedByRow && startedByText) {
+                if (['waiting', 'watering', 'stopping'].includes(state) && data.active_log?.trigger_label) {
+                    startedByText.textContent = data.active_log.trigger_label;
+                    startedByRow.classList.remove('hidden');
                 } else {
-                    triggerText.textContent = '';
-                    triggerText.classList.add('hidden');
+                    startedByText.textContent = 'N/A';
+                    startedByRow.classList.add('hidden');
                 }
             }
 
-            startWrapper?.classList.toggle('hidden', state !== 'idle');
-            stopWrapper?.classList.toggle('hidden', !['pending', 'running'].includes(state));
-            stoppingWrapper?.classList.toggle('hidden', state !== 'stopping');
+            if (offlineNote) {
+                offlineNote.classList.toggle('hidden', isOnline);
+            }
+
+            startWrapper?.classList.toggle('hidden', !(state === 'idle' && isOnline));
+            stopWrapper?.classList.toggle('hidden', !(['waiting', 'watering'].includes(state) && isOnline));
         }
 
         async function refreshDeviceStatus() {
@@ -221,7 +200,7 @@
 
                 setText('device-name', data.device.name);
                 setText('device-type', data.device.display_type);
-                setText('device-status', data.device.status_label);
+                setText('device-status', data.device.is_online ? 'Online' : 'Offline');
                 setText('device-location', data.device.location_label);
                 setText('device-timezone', data.device.timezone);
                 setText('device-mode', data.device.mode_label);
@@ -252,7 +231,6 @@
         setInterval(refreshDeviceStatus, 5000);
 
         const flashSuccess = document.getElementById('flash-success');
-
         if (flashSuccess) {
             setTimeout(() => {
                 flashSuccess.remove();

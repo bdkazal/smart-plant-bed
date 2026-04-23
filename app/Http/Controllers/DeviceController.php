@@ -62,21 +62,17 @@ class DeviceController extends Controller
             ->latest('id')
             ->first();
 
-        $latestActiveWateringLog = $device->wateringLogs()
-            ->whereIn('status', ['requested', 'running'])
-            ->latest('id')
-            ->first();
-
         $manualWateringState = $this->resolveManualWateringState($activeValveOnCommand, $activeValveOffCommand);
         $enabledScheduleCount = $device->wateringSchedules->count();
+        $isOnline = $this->isDeviceOnline($device);
 
         return view('devices.show', compact(
             'device',
             'latestReading',
-            'latestActiveWateringLog',
             'manualWateringState',
             'manualMaxDuration',
-            'enabledScheduleCount'
+            'enabledScheduleCount',
+            'isOnline'
         ));
     }
 
@@ -106,11 +102,6 @@ class DeviceController extends Controller
             ->latest('id')
             ->first();
 
-        $latestActiveWateringLog = WateringLog::where('device_id', $device->id)
-            ->whereIn('status', ['requested', 'running'])
-            ->latest('id')
-            ->first();
-
         $manualWateringState = $this->resolveManualWateringState($activeValveOnCommand, $activeValveOffCommand);
 
         return response()->json([
@@ -126,7 +117,7 @@ class DeviceController extends Controller
                 'mode_label' => ucfirst($device->wateringRule?->watering_mode ?? 'schedule'),
                 'enabled_schedule_count' => $device->wateringSchedules->count(),
                 'last_seen_human' => $device->last_seen_at?->diffForHumans() ?? 'Never',
-                'is_online' => $device->last_seen_at?->gt(now()->subSeconds(20)) ?? false,
+                'is_online' => $this->isDeviceOnline($device),
             ],
             'latest_reading' => [
                 'temperature' => $latestReading?->temperature,
@@ -138,10 +129,7 @@ class DeviceController extends Controller
                 'state' => $manualWateringState,
                 'state_label' => $this->manualStateLabel($manualWateringState),
                 'max_duration' => $device->wateringRule?->max_watering_duration_seconds ?? 300,
-            ],
-            'active_log' => [
-                'trigger_type' => $latestActiveWateringLog?->trigger_type,
-                'trigger_label' => $latestActiveWateringLog ? ucfirst($latestActiveWateringLog->trigger_type) : null,
+                'available' => $this->isDeviceOnline($device),
             ],
         ]);
     }
@@ -259,6 +247,14 @@ class DeviceController extends Controller
                 ]);
         }
 
+        if (! $this->isDeviceOnline($device)) {
+            return redirect()
+                ->route('devices.show', $device)
+                ->withErrors([
+                    'duration_seconds' => 'Device is offline. Manual watering is unavailable right now.',
+                ]);
+        }
+
         $rule = $device->wateringRule;
         $manualMaxDuration = $rule?->max_watering_duration_seconds ?? 300;
 
@@ -338,6 +334,14 @@ class DeviceController extends Controller
                 ]);
         }
 
+        if (! $this->isDeviceOnline($device)) {
+            return redirect()
+                ->route('devices.show', $device)
+                ->withErrors([
+                    'manual_control' => 'Device is offline. Stop command cannot be sent right now.',
+                ]);
+        }
+
         $activeValveOnCommand = DeviceCommand::where('device_id', $device->id)
             ->where('command_type', 'valve_on')
             ->whereIn('status', ['pending', 'acknowledged'])
@@ -387,6 +391,11 @@ class DeviceController extends Controller
         }
     }
 
+    private function isDeviceOnline(Device $device): bool
+    {
+        return $device->last_seen_at?->gt(now()->subSeconds(20)) ?? false;
+    }
+
     private function resolveManualWateringState(?DeviceCommand $activeValveOnCommand, ?DeviceCommand $activeValveOffCommand): string
     {
         if ($activeValveOffCommand) {
@@ -394,11 +403,11 @@ class DeviceController extends Controller
         }
 
         if ($activeValveOnCommand?->status === 'pending') {
-            return 'pending';
+            return 'waiting';
         }
 
         if ($activeValveOnCommand?->status === 'acknowledged') {
-            return 'running';
+            return 'watering';
         }
 
         return 'idle';
@@ -407,9 +416,9 @@ class DeviceController extends Controller
     private function manualStateLabel(string $state): string
     {
         return match ($state) {
-            'pending' => 'Waiting for device confirmation',
-            'running' => 'Watering in progress',
-            'stopping' => 'Stop request pending',
+            'waiting' => 'Waiting',
+            'watering' => 'Watering',
+            'stopping' => 'Stopping',
             default => 'Idle',
         };
     }
