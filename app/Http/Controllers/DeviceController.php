@@ -126,7 +126,7 @@ class DeviceController extends Controller
                 'mode_label' => ucfirst($device->wateringRule?->watering_mode ?? 'schedule'),
                 'enabled_schedule_count' => $device->wateringSchedules->count(),
                 'last_seen_human' => $device->last_seen_at?->diffForHumans() ?? 'Never',
-                'is_online' => $device->last_seen_at?->gt(now()->subMinutes(2)) ?? false,
+                'is_online' => $device->last_seen_at?->gt(now()->subSeconds(20)) ?? false,
             ],
             'latest_reading' => [
                 'temperature' => $latestReading?->temperature,

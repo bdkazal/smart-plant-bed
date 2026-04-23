@@ -35,6 +35,10 @@ class DeviceCommandController extends Controller
             ], 401);
         }
 
+        $device->update([
+            'last_seen_at' => now(),
+        ]);
+
         $this->cleanupStaleCommands($device);
 
         $command = $device->deviceCommands()
@@ -86,6 +90,10 @@ class DeviceCommandController extends Controller
                 'message' => 'Invalid device credentials.',
             ], 401);
         }
+
+        $device->update([
+            'last_seen_at' => now(),
+        ]);
 
         if ($command->device_id !== $device->id) {
             return response()->json([
