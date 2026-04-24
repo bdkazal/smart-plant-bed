@@ -47,11 +47,11 @@
         <div class="grid gap-4 md:grid-cols-2">
             <div class="rounded-lg bg-white p-5 shadow">
                 <h2 class="mb-3 text-lg font-semibold">Device Status</h2>
-                <p><strong>Type:</strong> <span id="device-type">{{ $device->displayType() }}</span></p>
                 <p><strong>Status:</strong> <span id="device-status">{{ $isOnline ? 'Online' : 'Offline' }}</span></p>
+                <p><strong>Type:</strong> <span id="device-type">{{ $device->displayType() }}</span></p>
                 <p><strong>Location:</strong> <span id="device-location">{{ $device->location_label ?? 'N/A' }}</span></p>
                 <p><strong>Timezone:</strong> <span id="device-timezone">{{ $device->timezone ?? 'Asia/Dhaka' }}</span></p>
-                <p><strong>Mode:</strong> <span id="device-mode">{{ ucfirst($device->wateringRule?->watering_mode ?? 'schedule') }}</span></p>
+                <p><strong>Automation Mode:</strong> <span id="device-mode">{{ ucfirst($device->wateringRule?->watering_mode ?? 'schedule') }}</span></p>
                 <p><strong>Enabled Schedules:</strong> <span id="enabled-schedules">{{ $enabledScheduleCount }}</span></p>
                 <p><strong>Last Seen:</strong> <span id="device-last-seen">{{ $device->last_seen_at?->diffForHumans() ?? 'Never' }}</span></p>
             </div>
@@ -199,8 +199,8 @@
                 const data = await response.json();
 
                 setText('device-name', data.device.name);
-                setText('device-type', data.device.display_type);
                 setText('device-status', data.device.is_online ? 'Online' : 'Offline');
+                setText('device-type', data.device.display_type);
                 setText('device-location', data.device.location_label);
                 setText('device-timezone', data.device.timezone);
                 setText('device-mode', data.device.mode_label);

@@ -25,6 +25,10 @@ class Device extends Model
         'timezone',
         'firmware_version',
         'last_seen_at',
+        'last_reported_at',
+        'last_reported_operation_state',
+        'last_reported_valve_state',
+        'last_reported_watering_state',
         'provisioning_token',
         'provisioning_expires_at',
     ];
@@ -32,6 +36,7 @@ class Device extends Model
     protected $casts = [
         'claimed_at' => 'datetime',
         'last_seen_at' => 'datetime',
+        'last_reported_at' => 'datetime',
         'provisioning_expires_at' => 'datetime',
     ];
 

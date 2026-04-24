@@ -49,20 +49,7 @@ class DeviceController extends Controller
 
         $latestReading = $device->sensorReadings->first();
         $manualMaxDuration = $device->wateringRule?->max_watering_duration_seconds ?? 300;
-
-        $activeValveOnCommand = DeviceCommand::where('device_id', $device->id)
-            ->where('command_type', 'valve_on')
-            ->whereIn('status', ['pending', 'acknowledged'])
-            ->latest('id')
-            ->first();
-
-        $activeValveOffCommand = DeviceCommand::where('device_id', $device->id)
-            ->where('command_type', 'valve_off')
-            ->whereIn('status', ['pending', 'acknowledged'])
-            ->latest('id')
-            ->first();
-
-        $manualWateringState = $this->resolveManualWateringState($activeValveOnCommand, $activeValveOffCommand);
+        $manualWateringState = $this->currentWateringState($device);
         $enabledScheduleCount = $device->wateringSchedules->count();
         $isOnline = $this->isDeviceOnline($device);
 
@@ -89,20 +76,7 @@ class DeviceController extends Controller
         ]);
 
         $latestReading = $device->sensorReadings->first();
-
-        $activeValveOnCommand = DeviceCommand::where('device_id', $device->id)
-            ->where('command_type', 'valve_on')
-            ->whereIn('status', ['pending', 'acknowledged'])
-            ->latest('id')
-            ->first();
-
-        $activeValveOffCommand = DeviceCommand::where('device_id', $device->id)
-            ->where('command_type', 'valve_off')
-            ->whereIn('status', ['pending', 'acknowledged'])
-            ->latest('id')
-            ->first();
-
-        $manualWateringState = $this->resolveManualWateringState($activeValveOnCommand, $activeValveOffCommand);
+        $manualWateringState = $this->currentWateringState($device);
 
         $latestActiveWateringLog = WateringLog::where('device_id', $device->id)
             ->whereIn('status', ['requested', 'running'])
@@ -123,6 +97,10 @@ class DeviceController extends Controller
                 'enabled_schedule_count' => $device->wateringSchedules->count(),
                 'last_seen_human' => $device->last_seen_at?->diffForHumans() ?? 'Never',
                 'is_online' => $this->isDeviceOnline($device),
+                'last_reported_at' => $device->last_reported_at?->format('Y-m-d H:i:s'),
+                'last_reported_operation_state' => $device->last_reported_operation_state,
+                'last_reported_valve_state' => $device->last_reported_valve_state,
+                'last_reported_watering_state' => $device->last_reported_watering_state,
             ],
             'latest_reading' => [
                 'temperature' => $latestReading?->temperature,
@@ -405,11 +383,32 @@ class DeviceController extends Controller
         return $device->last_seen_at?->gt(now()->subSeconds(20)) ?? false;
     }
 
-    private function resolveManualWateringState(?DeviceCommand $activeValveOnCommand, ?DeviceCommand $activeValveOffCommand): string
+    private function currentWateringState(Device $device): string
     {
+        if (
+            $this->isDeviceOnline($device) &&
+            $device->last_reported_at &&
+            $device->last_reported_at->gt(now()->subSeconds(30)) &&
+            $device->last_reported_watering_state === 'watering'
+        ) {
+            return 'watering';
+        }
+
+        $activeValveOffCommand = DeviceCommand::where('device_id', $device->id)
+            ->where('command_type', 'valve_off')
+            ->whereIn('status', ['pending', 'acknowledged'])
+            ->latest('id')
+            ->first();
+
         if ($activeValveOffCommand) {
             return 'stopping';
         }
+
+        $activeValveOnCommand = DeviceCommand::where('device_id', $device->id)
+            ->where('command_type', 'valve_on')
+            ->whereIn('status', ['pending', 'acknowledged'])
+            ->latest('id')
+            ->first();
 
         if ($activeValveOnCommand?->status === 'pending') {
             return 'waiting';
@@ -417,6 +416,10 @@ class DeviceController extends Controller
 
         if ($activeValveOnCommand?->status === 'acknowledged') {
             return 'watering';
+        }
+
+        if ($device->last_reported_watering_state === 'idle') {
+            return 'idle';
         }
 
         return 'idle';
