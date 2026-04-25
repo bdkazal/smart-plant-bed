@@ -56,7 +56,7 @@ class DeviceStateController extends Controller
         $device->update([
             'firmware_version' => $validated['firmware_version'] ?? $device->firmware_version,
             'last_seen_at' => now(),
-            'last_reported_at' => $validated['reported_at'] ?? now(),
+            'last_reported_at' => now(),
             'last_reported_operation_state' => $validated['operation_state'],
             'last_reported_valve_state' => $validated['valve_state'] ?? null,
             'last_reported_watering_state' => $validated['watering_state'] ?? null,
