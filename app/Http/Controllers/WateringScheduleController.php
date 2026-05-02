@@ -40,10 +40,20 @@ class WateringScheduleController extends Controller
             'is_enabled' => ['nullable', 'boolean'],
         ]);
 
+        $timeOfDay = $validated['time_of_day'] . ':00';
+
+        if ($this->scheduleTimeExists($device, (int) $validated['day_of_week'], $timeOfDay)) {
+            return back()
+                ->withErrors([
+                    'time_of_day' => 'A watering schedule already exists for this day and time.',
+                ])
+                ->withInput();
+        }
+
         WateringSchedule::create([
             'device_id' => $device->id,
             'day_of_week' => (int) $validated['day_of_week'],
-            'time_of_day' => $validated['time_of_day'] . ':00',
+            'time_of_day' => $timeOfDay,
             'duration_seconds' => (int) $validated['duration_seconds'],
             'is_enabled' => $request->boolean('is_enabled'),
         ]);
@@ -71,9 +81,19 @@ class WateringScheduleController extends Controller
             'is_enabled' => ['nullable', 'boolean'],
         ]);
 
+        $timeOfDay = $validated['time_of_day'] . ':00';
+
+        if ($this->scheduleTimeExists($device, (int) $validated['day_of_week'], $timeOfDay, $schedule->id)) {
+            return back()
+                ->withErrors([
+                    'time_of_day' => 'A watering schedule already exists for this day and time.',
+                ])
+                ->withInput();
+        }
+
         $schedule->update([
             'day_of_week' => (int) $validated['day_of_week'],
-            'time_of_day' => $validated['time_of_day'] . ':00',
+            'time_of_day' => $timeOfDay,
             'duration_seconds' => (int) $validated['duration_seconds'],
             'is_enabled' => $request->boolean('is_enabled'),
         ]);
@@ -123,5 +143,14 @@ class WateringScheduleController extends Controller
         if ($schedule->device_id !== $device->id) {
             abort(404);
         }
+    }
+
+    private function scheduleTimeExists(Device $device, int $dayOfWeek, string $timeOfDay, ?int $exceptScheduleId = null): bool
+    {
+        return WateringSchedule::where('device_id', $device->id)
+            ->where('day_of_week', $dayOfWeek)
+            ->where('time_of_day', $timeOfDay)
+            ->when($exceptScheduleId, fn($query) => $query->whereKeyNot($exceptScheduleId))
+            ->exists();
     }
 }
