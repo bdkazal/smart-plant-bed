@@ -31,6 +31,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/devices/{device}/settings', [DeviceController::class, 'updateSettings'])->name('devices.settings.update');
     Route::post('/devices/{device}/water-now', [DeviceController::class, 'waterNow'])->name('devices.water-now');
     Route::post('/devices/{device}/water-stop', [DeviceController::class, 'stopWatering'])->name('devices.water-stop');
+    Route::post('/devices/{device}/outputs/{output}/set', [DeviceController::class, 'setOutput'])->name('devices.outputs.set');
 
     Route::get('/devices/{device}/schedules', [WateringScheduleController::class, 'index'])
         ->name('devices.schedules.index');
