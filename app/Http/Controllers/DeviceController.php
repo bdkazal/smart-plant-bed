@@ -398,6 +398,95 @@ class DeviceController extends Controller
             ->with('success', 'Stop watering command created successfully.');
     }
 
+    public function setOutput(Request $request, Device $device, string $output): RedirectResponse
+    {
+        $this->authorizeDevice($device);
+
+        if ($device->status !== 'active') {
+            return redirect()
+                ->route('devices.show', $device)
+                ->withErrors([
+                    'output' => 'Output control is only available when the device is active in this account.',
+                ]);
+        }
+
+        $deviceOutput = $device->outputs()
+            ->where('key', $output)
+            ->firstOrFail();
+
+        $state = match ($deviceOutput->key) {
+            'pump' => $this->validatedPumpState($request),
+            'cob_light' => $this->validatedCobLightState($request),
+            'rgb_light' => $this->validatedRgbLightState($request),
+            default => abort(422, 'Unsupported output.'),
+        };
+
+        $deviceOutput->update([
+            'state' => array_merge($deviceOutput->state ?? [], $state),
+            'last_changed_source' => 'dashboard',
+            'last_changed_at' => now(),
+        ]);
+
+        DeviceCommand::create([
+            'device_id' => $device->id,
+            'command_type' => 'output_set',
+            'payload' => [
+                'output' => $deviceOutput->key,
+                'state' => $state,
+                'source' => 'dashboard',
+            ],
+            'status' => 'pending',
+            'issued_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('devices.show', $device)
+            ->with('success', "{$deviceOutput->name} command created successfully.");
+    }
+
+    private function validatedPumpState(Request $request): array
+    {
+        $validated = $request->validate([
+            'enabled' => ['nullable', 'boolean'],
+            'speed_percent' => ['required', 'integer', 'min:0', 'max:100'],
+        ]);
+
+        return [
+            'enabled' => $request->boolean('enabled'),
+            'speed_percent' => (int) $validated['speed_percent'],
+        ];
+    }
+
+    private function validatedCobLightState(Request $request): array
+    {
+        $validated = $request->validate([
+            'enabled' => ['nullable', 'boolean'],
+            'brightness_percent' => ['required', 'integer', 'min:0', 'max:100'],
+        ]);
+
+        return [
+            'enabled' => $request->boolean('enabled'),
+            'brightness_percent' => (int) $validated['brightness_percent'],
+        ];
+    }
+
+    private function validatedRgbLightState(Request $request): array
+    {
+        $validated = $request->validate([
+            'enabled' => ['nullable', 'boolean'],
+            'brightness_percent' => ['required', 'integer', 'min:0', 'max:100'],
+            'color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'effect' => ['required', 'in:solid,breathing,slow_rainbow,warm_glow,water_shimmer,night_mode'],
+        ]);
+
+        return [
+            'enabled' => $request->boolean('enabled'),
+            'brightness_percent' => (int) $validated['brightness_percent'],
+            'color' => strtoupper($validated['color']),
+            'effect' => $validated['effect'],
+        ];
+    }
+
     private function authorizeDevice(Device $device): void
     {
         $user = Auth::user();
