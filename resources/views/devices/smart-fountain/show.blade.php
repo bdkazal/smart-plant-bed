@@ -53,7 +53,7 @@
         <div class="grid gap-4 md:grid-cols-2">
             <div class="rounded-lg bg-white p-5 shadow">
                 <h2 class="mb-3 text-lg font-semibold">Device Status</h2>
-                <p><strong>Status:</strong> {{ $isOnline ? 'Online' : ucfirst($device->status) }}</p>
+                <p><strong>Status:</strong> {{ $isOnline ? 'Online' : 'Offline' }}</p>
                 <p><strong>Type:</strong> {{ $device->displayType() }}</p>
                 <p><strong>Location:</strong> {{ $device->location_label ?? 'N/A' }}</p>
                 <p><strong>Timezone:</strong> {{ $device->timezone ?? 'Asia/Dhaka' }}</p>
