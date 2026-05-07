@@ -29,6 +29,10 @@ class DeviceController extends Controller
 
         $this->cleanupStaleCommands($device);
 
+        if ($device->isSmartFountain()) {
+            return $this->showSmartFountain($device);
+        }
+
         $today = now($device->timezone ?? config('app.timezone'))->dayOfWeekIso;
 
         $device->load([
@@ -59,6 +63,31 @@ class DeviceController extends Controller
             'manualWateringState',
             'manualMaxDuration',
             'enabledScheduleCount',
+            'isOnline'
+        ));
+    }
+
+    private function showSmartFountain(Device $device): View
+    {
+        $device->load([
+            'capabilities',
+            'outputs',
+            'platformReadings' => fn($query) => $query->latest()->limit(10),
+            'deviceCommands' => fn($query) => $query->latest()->limit(5),
+        ]);
+
+        $outputs = $device->outputs->keyBy('key');
+
+        $latestReadings = $device->platformReadings
+            ->groupBy('metric')
+            ->map(fn($readings) => $readings->first());
+
+        $isOnline = $this->isDeviceOnline($device);
+
+        return view('devices.smart-fountain.show', compact(
+            'device',
+            'outputs',
+            'latestReadings',
             'isOnline'
         ));
     }
