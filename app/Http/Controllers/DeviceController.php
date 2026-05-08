@@ -421,12 +421,6 @@ class DeviceController extends Controller
             default => abort(422, 'Unsupported output.'),
         };
 
-        $deviceOutput->update([
-            'state' => array_merge($deviceOutput->state ?? [], $state),
-            'last_changed_source' => 'dashboard',
-            'last_changed_at' => now(),
-        ]);
-
         DeviceCommand::create([
             'device_id' => $device->id,
             'command_type' => 'output_set',
@@ -441,7 +435,7 @@ class DeviceController extends Controller
 
         return redirect()
             ->route('devices.show', $device)
-            ->with('success', "{$deviceOutput->name} command created successfully.");
+            ->with('success', "{$deviceOutput->name} command created successfully. Waiting for device confirmation.");
     }
 
     private function validatedPumpState(Request $request): array
