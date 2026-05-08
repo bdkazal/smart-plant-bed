@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Device;
 use App\Models\DeviceCommand;
 use App\Models\WateringLog;
+use App\Services\DeviceCommandLifecycleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -549,63 +550,7 @@ class DeviceController extends Controller
 
     private function cleanupStaleCommands(Device $device): void
     {
-        $expiredPendingCommands = DeviceCommand::where('device_id', $device->id)
-            ->where('status', 'pending')
-            ->where('issued_at', '<', now()->subMinute())
-            ->get();
-
-        foreach ($expiredPendingCommands as $command) {
-            $command->update([
-                'status' => 'expired',
-            ]);
-
-            WateringLog::where('device_command_id', $command->id)
-                ->where('status', 'requested')
-                ->update([
-                    'status' => 'failed',
-                    'ended_at' => now(),
-                    'notes' => 'Command expired before device confirmation.',
-                ]);
-        }
-
-        $acknowledgedCommands = DeviceCommand::where('device_id', $device->id)
-            ->where('status', 'acknowledged')
-            ->get();
-
-        foreach ($acknowledgedCommands as $command) {
-            $timedOut = false;
-
-            if ($command->command_type === 'valve_on') {
-                $durationSeconds = (int) data_get($command->payload, 'duration_seconds', 0);
-                $timeoutSeconds = max($durationSeconds, 0) + 60;
-
-                $timedOut = $command->acknowledged_at
-                    && $command->acknowledged_at->copy()->addSeconds($timeoutSeconds)->isPast();
-            }
-
-            if ($command->command_type === 'valve_off') {
-                $timedOut = $command->acknowledged_at
-                    && $command->acknowledged_at->copy()->addSeconds(60)->isPast();
-            }
-
-            if (! $timedOut) {
-                continue;
-            }
-
-            $command->update([
-                'status' => 'failed',
-            ]);
-
-            $log = WateringLog::where('device_command_id', $command->id)->latest('id')->first();
-
-            if ($log && in_array($log->status, ['requested', 'running'], true)) {
-                $log->update([
-                    'status' => 'failed',
-                    'ended_at' => now(),
-                    'notes' => trim(($log->notes ? $log->notes . ' ' : '') . 'Device acknowledged command but no completion was received before timeout.'),
-                ]);
-            }
-        }
+        app(DeviceCommandLifecycleService::class)->cleanupStaleCommands($device);
     }
 
     private function getTimezoneOptions(): array
