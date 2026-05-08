@@ -16,17 +16,17 @@
 
         <div class="mb-6 flex items-center justify-between gap-4">
             <div>
-                <h1 class="text-2xl font-bold">{{ $device->name }}</h1>
-                <p class="text-gray-600">{{ $device->displayType() }}</p>
+                <h1 id="device-name" class="text-2xl font-bold">{{ $device->name }}</h1>
+                <p id="device-type-heading" class="text-gray-600">{{ $device->displayType() }}</p>
             </div>
 
-            <div class="rounded-full px-3 py-1 text-sm {{ $isOnline ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700' }}">
+            <div id="online-badge" class="rounded-full px-3 py-1 text-sm {{ $isOnline ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700' }}">
                 {{ $isOnline ? 'Online' : 'Offline' }}
             </div>
         </div>
 
         @if (session('success'))
-            <div class="mb-4 rounded bg-green-100 px-4 py-3 text-green-800">
+            <div id="flash-success" class="mb-4 rounded bg-green-100 px-4 py-3 text-green-800">
                 {{ session('success') }}
             </div>
         @endif
@@ -93,11 +93,11 @@
         <div class="grid gap-4 md:grid-cols-2">
             <div class="rounded-lg bg-white p-5 shadow">
                 <h2 class="mb-3 text-lg font-semibold">Device Status</h2>
-                <p><strong>Status:</strong> {{ $isOnline ? 'Online' : 'Offline' }}</p>
-                <p><strong>Type:</strong> {{ $device->displayType() }}</p>
-                <p><strong>Location:</strong> {{ $device->location_label ?? 'N/A' }}</p>
-                <p><strong>Timezone:</strong> {{ $device->timezone ?? 'Asia/Dhaka' }}</p>
-                <p><strong>Last Seen:</strong> {{ $device->last_seen_at?->diffForHumans() ?? 'Never' }}</p>
+                <p><strong>Status:</strong> <span id="device-status">{{ $isOnline ? 'Online' : 'Offline' }}</span></p>
+                <p><strong>Type:</strong> <span id="device-type">{{ $device->displayType() }}</span></p>
+                <p><strong>Location:</strong> <span id="device-location">{{ $device->location_label ?? 'N/A' }}</span></p>
+                <p><strong>Timezone:</strong> <span id="device-timezone">{{ $device->timezone ?? 'Asia/Dhaka' }}</span></p>
+                <p><strong>Last Seen:</strong> <span id="device-last-seen">{{ $device->last_seen_at?->diffForHumans() ?? 'Never' }}</span></p>
             </div>
 
             <div class="rounded-lg bg-white p-5 shadow">
@@ -105,37 +105,37 @@
 
                 <p>
                     <strong>Water Low:</strong>
-                    @if (is_null($waterLow))
-                        N/A
-                    @elseif ((int) $waterLow === 1)
-                        <span class="font-semibold text-red-600">Yes</span>
-                    @else
-                        <span class="font-semibold text-green-700">No</span>
-                    @endif
+                    <span id="water-low" class="{{ is_null($waterLow) ? '' : ((int) $waterLow === 1 ? 'font-semibold text-red-600' : 'font-semibold text-green-700') }}">
+                        @if (is_null($waterLow))
+                            N/A
+                        @elseif ((int) $waterLow === 1)
+                            Yes
+                        @else
+                            No
+                        @endif
+                    </span>
                 </p>
 
                 <p>
                     <strong>Water Level:</strong>
-                    {{ is_null($waterLevel) ? 'N/A' : number_format($waterLevel, 0) . '%' }}
+                    <span id="water-level">{{ is_null($waterLevel) ? 'N/A' : number_format($waterLevel, 0) . '%' }}</span>
                 </p>
 
-                @if ((int) $waterLow === 1)
-                    <div class="mt-4 rounded border border-red-300 bg-red-50 px-4 py-3 text-red-700">
-                        Low water detected. Pump should stay OFF to protect the motor.
-                    </div>
-                @endif
+                <div id="water-low-warning" class="{{ (int) $waterLow === 1 ? '' : 'hidden' }} mt-4 rounded border border-red-300 bg-red-50 px-4 py-3 text-red-700">
+                    Low water detected. Pump should stay OFF to protect the motor.
+                </div>
             </div>
         </div>
 
         <div class="mt-4 grid gap-4 md:grid-cols-3">
             <div class="rounded-lg bg-white p-5 shadow">
                 <h2 class="mb-3 text-lg font-semibold">Pump</h2>
-                <p><strong>State:</strong> {{ data_get($pump?->state, 'enabled') ? 'ON' : 'OFF' }}</p>
-                <p><strong>Speed:</strong> {{ data_get($pump?->state, 'speed_percent', 0) }}%</p>
-                <p><strong>Source:</strong> {{ $pump?->last_changed_source ?? 'N/A' }}</p>
+                <p><strong>State:</strong> <span id="pump-state">{{ data_get($pump?->state, 'enabled') ? 'ON' : 'OFF' }}</span></p>
+                <p><strong>Speed:</strong> <span id="pump-speed">{{ data_get($pump?->state, 'speed_percent', 0) }}%</span></p>
+                <p><strong>Source:</strong> <span id="pump-source">{{ $pump?->last_changed_source ?? 'N/A' }}</span></p>
                 <p class="mt-2">
                     <strong>Last Command:</strong>
-                    <span class="rounded-full px-2 py-1 text-xs {{ $commandClass($pumpCommand) }}">
+                    <span id="pump-command" data-command-badge class="rounded-full px-2 py-1 text-xs {{ $commandClass($pumpCommand) }}">
                         {{ $commandLabel($pumpCommand) }}
                     </span>
                 </p>
@@ -143,12 +143,12 @@
 
             <div class="rounded-lg bg-white p-5 shadow">
                 <h2 class="mb-3 text-lg font-semibold">COB Light</h2>
-                <p><strong>State:</strong> {{ data_get($cobLight?->state, 'enabled') ? 'ON' : 'OFF' }}</p>
-                <p><strong>Brightness:</strong> {{ data_get($cobLight?->state, 'brightness_percent', 0) }}%</p>
-                <p><strong>Source:</strong> {{ $cobLight?->last_changed_source ?? 'N/A' }}</p>
+                <p><strong>State:</strong> <span id="cob-light-state">{{ data_get($cobLight?->state, 'enabled') ? 'ON' : 'OFF' }}</span></p>
+                <p><strong>Brightness:</strong> <span id="cob-light-brightness">{{ data_get($cobLight?->state, 'brightness_percent', 0) }}%</span></p>
+                <p><strong>Source:</strong> <span id="cob-light-source">{{ $cobLight?->last_changed_source ?? 'N/A' }}</span></p>
                 <p class="mt-2">
                     <strong>Last Command:</strong>
-                    <span class="rounded-full px-2 py-1 text-xs {{ $commandClass($cobLightCommand) }}">
+                    <span id="cob-light-command" data-command-badge class="rounded-full px-2 py-1 text-xs {{ $commandClass($cobLightCommand) }}">
                         {{ $commandLabel($cobLightCommand) }}
                     </span>
                 </p>
@@ -156,14 +156,14 @@
 
             <div class="rounded-lg bg-white p-5 shadow">
                 <h2 class="mb-3 text-lg font-semibold">RGB Light</h2>
-                <p><strong>State:</strong> {{ data_get($rgbLight?->state, 'enabled') ? 'ON' : 'OFF' }}</p>
-                <p><strong>Brightness:</strong> {{ data_get($rgbLight?->state, 'brightness_percent', 0) }}%</p>
-                <p><strong>Color:</strong> {{ data_get($rgbLight?->state, 'color', 'N/A') }}</p>
-                <p><strong>Effect:</strong> {{ str_replace('_', ' ', data_get($rgbLight?->state, 'effect', 'N/A')) }}</p>
-                <p><strong>Source:</strong> {{ $rgbLight?->last_changed_source ?? 'N/A' }}</p>
+                <p><strong>State:</strong> <span id="rgb-light-state">{{ data_get($rgbLight?->state, 'enabled') ? 'ON' : 'OFF' }}</span></p>
+                <p><strong>Brightness:</strong> <span id="rgb-light-brightness">{{ data_get($rgbLight?->state, 'brightness_percent', 0) }}%</span></p>
+                <p><strong>Color:</strong> <span id="rgb-light-color">{{ data_get($rgbLight?->state, 'color', 'N/A') }}</span></p>
+                <p><strong>Effect:</strong> <span id="rgb-light-effect">{{ str_replace('_', ' ', data_get($rgbLight?->state, 'effect', 'N/A')) }}</span></p>
+                <p><strong>Source:</strong> <span id="rgb-light-source">{{ $rgbLight?->last_changed_source ?? 'N/A' }}</span></p>
                 <p class="mt-2">
                     <strong>Last Command:</strong>
-                    <span class="rounded-full px-2 py-1 text-xs {{ $commandClass($rgbLightCommand) }}">
+                    <span id="rgb-light-command" data-command-badge class="rounded-full px-2 py-1 text-xs {{ $commandClass($rgbLightCommand) }}">
                         {{ $commandLabel($rgbLightCommand) }}
                     </span>
                 </p>
@@ -179,7 +179,11 @@
                 </div>
             @else
                 @if (! $isOnline)
-                    <div class="mb-4 rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-800">
+                    <div id="offline-note" class="mb-4 rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-800">
+                        Device is offline. These controls will still create pending Laravel commands for backend testing; real hardware will apply them when it connects and polls commands.
+                    </div>
+                @else
+                    <div id="offline-note" class="hidden mb-4 rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-800">
                         Device is offline. These controls will still create pending Laravel commands for backend testing; real hardware will apply them when it connects and polls commands.
                     </div>
                 @endif
@@ -190,7 +194,7 @@
                         <h3 class="mb-3 font-semibold">Pump Control</h3>
 
                         <label class="mb-3 flex items-center gap-2">
-                            <input type="checkbox" name="enabled" value="1" {{ data_get($pump?->state, 'enabled') ? 'checked' : '' }}>
+                            <input id="pump-enabled-input" type="checkbox" name="enabled" value="1" {{ data_get($pump?->state, 'enabled') ? 'checked' : '' }}>
                             <span>Enable pump</span>
                         </label>
 
@@ -215,7 +219,7 @@
                         <h3 class="mb-3 font-semibold">COB Light Control</h3>
 
                         <label class="mb-3 flex items-center gap-2">
-                            <input type="checkbox" name="enabled" value="1" {{ data_get($cobLight?->state, 'enabled') ? 'checked' : '' }}>
+                            <input id="cob-light-enabled-input" type="checkbox" name="enabled" value="1" {{ data_get($cobLight?->state, 'enabled') ? 'checked' : '' }}>
                             <span>Enable COB light</span>
                         </label>
 
@@ -240,7 +244,7 @@
                         <h3 class="mb-3 font-semibold">RGB Light Control</h3>
 
                         <label class="mb-3 flex items-center gap-2">
-                            <input type="checkbox" name="enabled" value="1" {{ data_get($rgbLight?->state, 'enabled') ? 'checked' : '' }}>
+                            <input id="rgb-light-enabled-input" type="checkbox" name="enabled" value="1" {{ data_get($rgbLight?->state, 'enabled') ? 'checked' : '' }}>
                             <span>Enable RGB light</span>
                         </label>
 
@@ -281,6 +285,151 @@
             @endif
         </div>
     </div>
+
+    <script>
+        const smartFountainStatusUrl = "{{ route('devices.smart-fountain.status', $device) }}";
+
+        function setText(id, value) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = value ?? 'N/A';
+        }
+
+        function setInputValue(id, value) {
+            const el = document.getElementById(id);
+            if (!el || document.activeElement === el) return;
+            el.value = value ?? '';
+        }
+
+        function setCheckbox(id, checked) {
+            const el = document.getElementById(id);
+            if (!el || document.activeElement === el) return;
+            el.checked = Boolean(checked);
+        }
+
+        function commandBadgeClass(status) {
+            if (status === 'pending') return 'rounded-full px-2 py-1 text-xs bg-yellow-100 text-yellow-800';
+            if (status === 'acknowledged') return 'rounded-full px-2 py-1 text-xs bg-blue-100 text-blue-800';
+            if (status === 'executed') return 'rounded-full px-2 py-1 text-xs bg-green-100 text-green-800';
+            if (status === 'failed' || status === 'expired') return 'rounded-full px-2 py-1 text-xs bg-red-100 text-red-800';
+            return 'rounded-full px-2 py-1 text-xs bg-gray-100 text-gray-700';
+        }
+
+        function updateCommandBadge(id, command) {
+            const el = document.getElementById(id);
+            if (!el) return;
+
+            el.textContent = command?.status_label ?? 'None yet';
+            el.className = commandBadgeClass(command?.status);
+        }
+
+        function updateOnlineStatus(device) {
+            setText('device-name', device.name);
+            setText('device-type-heading', device.display_type);
+            setText('device-status', device.is_online ? 'Online' : 'Offline');
+            setText('device-type', device.display_type);
+            setText('device-location', device.location_label);
+            setText('device-timezone', device.timezone);
+            setText('device-last-seen', device.last_seen_human);
+
+            const badge = document.getElementById('online-badge');
+            if (badge) {
+                badge.textContent = device.is_online ? 'Online' : 'Offline';
+                badge.className = device.is_online ?
+                    'rounded-full px-3 py-1 text-sm bg-green-100 text-green-800' :
+                    'rounded-full px-3 py-1 text-sm bg-gray-200 text-gray-700';
+            }
+
+            document.getElementById('offline-note')?.classList.toggle('hidden', device.is_online);
+        }
+
+        function updateWaterSafety(readings) {
+            const waterLow = readings.water_low;
+            const waterLevel = readings.water_level_percent;
+            const waterLowEl = document.getElementById('water-low');
+
+            if (waterLowEl) {
+                if (waterLow === null || waterLow === undefined) {
+                    waterLowEl.textContent = 'N/A';
+                    waterLowEl.className = '';
+                } else if (Number(waterLow) === 1) {
+                    waterLowEl.textContent = 'Yes';
+                    waterLowEl.className = 'font-semibold text-red-600';
+                } else {
+                    waterLowEl.textContent = 'No';
+                    waterLowEl.className = 'font-semibold text-green-700';
+                }
+            }
+
+            setText('water-level', waterLevel === null || waterLevel === undefined ? 'N/A' : `${Number(waterLevel).toFixed(0)}%`);
+            document.getElementById('water-low-warning')?.classList.toggle('hidden', Number(waterLow) !== 1);
+        }
+
+        function updateOutputCards(outputs) {
+            const pump = outputs.pump ?? {};
+            const pumpState = pump.state ?? {};
+            setText('pump-state', pumpState.enabled ? 'ON' : 'OFF');
+            setText('pump-speed', `${pumpState.speed_percent ?? 0}%`);
+            setText('pump-source', pump.last_changed_source ?? 'N/A');
+            updateCommandBadge('pump-command', pump.last_command);
+            setCheckbox('pump-enabled-input', pumpState.enabled);
+            setInputValue('pump_speed_percent', pumpState.speed_percent ?? 0);
+
+            const cob = outputs.cob_light ?? {};
+            const cobState = cob.state ?? {};
+            setText('cob-light-state', cobState.enabled ? 'ON' : 'OFF');
+            setText('cob-light-brightness', `${cobState.brightness_percent ?? 0}%`);
+            setText('cob-light-source', cob.last_changed_source ?? 'N/A');
+            updateCommandBadge('cob-light-command', cob.last_command);
+            setCheckbox('cob-light-enabled-input', cobState.enabled);
+            setInputValue('cob_brightness_percent', cobState.brightness_percent ?? 0);
+
+            const rgb = outputs.rgb_light ?? {};
+            const rgbState = rgb.state ?? {};
+            setText('rgb-light-state', rgbState.enabled ? 'ON' : 'OFF');
+            setText('rgb-light-brightness', `${rgbState.brightness_percent ?? 0}%`);
+            setText('rgb-light-color', rgbState.color ?? 'N/A');
+            setText('rgb-light-effect', (rgbState.effect ?? 'N/A').replaceAll('_', ' '));
+            setText('rgb-light-source', rgb.last_changed_source ?? 'N/A');
+            updateCommandBadge('rgb-light-command', rgb.last_command);
+            setCheckbox('rgb-light-enabled-input', rgbState.enabled);
+            setInputValue('rgb_brightness_percent', rgbState.brightness_percent ?? 0);
+            setInputValue('rgb_color', rgbState.color ?? '#FFB066');
+            setInputValue('rgb_effect', rgbState.effect ?? 'warm_glow');
+        }
+
+        async function refreshSmartFountainStatus() {
+            try {
+                const response = await fetch(smartFountainStatusUrl, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                });
+
+                if (!response.ok) return;
+
+                const data = await response.json();
+
+                updateOnlineStatus(data.device);
+                updateWaterSafety(data.readings ?? {});
+                updateOutputCards(data.outputs ?? {});
+            } catch (error) {
+                console.error('Smart Fountain status refresh failed:', error);
+            }
+        }
+
+        refreshSmartFountainStatus();
+        setInterval(refreshSmartFountainStatus, 5000);
+
+        const flashSuccess = document.getElementById('flash-success');
+        if (flashSuccess) {
+            setTimeout(() => {
+                flashSuccess.remove();
+            }, 5000);
+        }
+    </script>
 </body>
 
 </html>
