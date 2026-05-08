@@ -333,6 +333,143 @@ The auto-off is not the same as Plant Bed's watering runtime. It is a later auto
 
 ---
 
+## Smart Fountain Command Findings
+
+These rules were confirmed while testing Smart Fountain with the dashboard and Postman as a mock device.
+
+### 1. Dashboard commands are requests, not proof of hardware state
+
+When the user submits a Smart Fountain control form, Laravel should create a pending command:
+
+```text
+command_type = output_set
+status = pending
+```
+
+The dashboard must not treat that request as proof that the real pump/light already changed.
+
+Current intended flow:
+
+```text
+Dashboard sends command
+→ Laravel creates pending output_set
+→ Device polls command
+→ Device acknowledges command
+→ Device executes command
+→ Laravel applies the output state
+→ Dashboard auto-refresh shows the new state
+```
+
+This keeps Smart Fountain closer to the Plant Bed pattern where the dashboard shows command progress instead of pretending the action already happened.
+
+### 2. Failed and expired commands are closed
+
+If a Smart Fountain command fails or expires:
+
+```text
+old failed/expired command is not replayed later
+user must send a new command if still needed
+```
+
+This is safer than automatically running old commands when a device reconnects later.
+
+Example:
+
+```text
+User requested pump ON.
+Device missed the command.
+Later the water level may be low.
+Laravel must not auto-run the old pump command.
+```
+
+### 3. `executed` can update confirmed output state for V1
+
+For Smart Fountain `output_set`, an executed ACK means the device says the requested state was applied.
+
+For V1/Postman testing, Laravel applies the output state when the device sends:
+
+```json
+{
+  "device_uuid": "...",
+  "status": "executed"
+}
+```
+
+to:
+
+```http
+POST /api/device/commands/{command}/ack
+```
+
+This updates `device_outputs.state` using the command payload.
+
+A real firmware can still send `/api/device/state` after that to sync the full actual hardware state and readings.
+
+Recommended real-device flow:
+
+```text
+1. Poll pending command
+2. ACK acknowledged
+3. Apply output locally
+4. ACK executed
+5. POST /api/device/state with actual outputs/readings
+```
+
+### 4. Dashboard should show simple command status near each control
+
+Do not expose internal terms like `desired_state` and `reported_state` to normal users.
+
+User-facing labels should stay simple:
+
+```text
+Waiting for device
+Applying
+Applied
+Failed
+Expired
+```
+
+Smart Fountain control cards should show:
+
+```text
+Current State
+Source
+Last Command
+Control inputs
+Send button
+```
+
+This follows the same practical idea as the Plant Bed dashboard showing:
+
+```text
+Idle
+Waiting
+Watering
+Stopping
+```
+
+### 5. Auto-refresh is required
+
+Smart Fountain dashboard should auto-refresh like Plant Bed.
+
+Current Smart Fountain web status route:
+
+```http
+GET /devices/{device}/smart-fountain/status
+```
+
+The dashboard should poll it periodically to update:
+
+```text
+online/offline
+last seen
+water safety
+output states
+last command status badges
+```
+
+---
+
 ## Platform Foundation Direction
 
 New products should not be implemented by hardcoding every feature into the `devices` table or by creating a separate Laravel app per product.
@@ -506,6 +643,9 @@ The Laravel side already includes:
   - `device_readings`
   - `devices.last_reported_state`
 - early Smart Fountain dashboard using generic `output_set` commands
+- Smart Fountain platform config API
+- Smart Fountain platform state sync API
+- Smart Fountain dashboard auto-refresh/status endpoint
 
 The ESP32/device-side runtime logic is designed after the Laravel/API contract is stable.
 
@@ -644,9 +784,33 @@ The device identifies itself using:
 
 Important unfinished areas:
 
-### 1. Platform State Sync
+### 1. Shared Command Lifecycle Service
 
-For new persistent state devices, `/api/device/state` should support platform-style output states and generic readings.
+Command cleanup/timeout logic should be moved into a shared service.
+
+Current risk:
+
+```text
+web controller cleanup and API controller cleanup can drift apart
+```
+
+Recommended future service:
+
+```text
+app/Services/DeviceCommandLifecycleService.php
+```
+
+Use it from:
+
+```text
+DeviceController
+DeviceCommandController
+DeviceReadingController or future automation services
+```
+
+### 2. Platform State Sync
+
+For new persistent state devices, `/api/device/state` supports platform-style output states and generic readings.
 
 Desired Smart Fountain state shape:
 
@@ -688,7 +852,18 @@ Desired Smart Fountain state shape:
 }
 ```
 
-### 2. Generic Schedules / Scenes
+### 3. Desired State vs Reported State
+
+Do not expose these words to normal users, but the backend may eventually need separate state fields:
+
+```text
+desired_state = what Laravel/user/schedule requested
+reported_state = what device confirmed as actual hardware state
+```
+
+For V1, the command lifecycle plus `/api/device/state` is enough. Before serious production hardware, consider adding explicit desired/reported state separation if command/state mismatch becomes common.
+
+### 4. Generic Schedules / Scenes
 
 Plant Bed currently has watering schedules. Persistent state devices need state-range schedules and scenes.
 
@@ -700,7 +875,7 @@ device_scenes
 device_automation_rules
 ```
 
-### 3. ESP32 Runtime Design Per Product
+### 5. ESP32 Runtime Design Per Product
 
 The detailed device-side control loop should be designed per product after the Laravel/API contract is stable.
 
@@ -769,5 +944,7 @@ When opening a new thread for a new device, preserve these platform rules:
 - distinguish timed action devices from persistent state devices
 - use `executed = completed` only for timed action devices
 - use `executed = state applied` for persistent state devices
+- keep failed/expired commands closed; do not replay them automatically on reconnect
+- show simple user-facing command states, not internal state jargon
 - use capabilities/outputs/readings for new device types
 - keep existing Plant Bed functionality working while adding platform features
