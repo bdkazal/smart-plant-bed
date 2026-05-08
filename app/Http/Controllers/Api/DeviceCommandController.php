@@ -35,10 +35,7 @@ class DeviceCommandController extends Controller
             ], 401);
         }
 
-        $device->update([
-            'last_seen_at' => now(),
-        ]);
-
+        $this->markDeviceSeen($device);
         $this->cleanupStaleCommands($device);
 
         $command = $device->deviceCommands()
@@ -91,9 +88,7 @@ class DeviceCommandController extends Controller
             ], 401);
         }
 
-        $device->update([
-            'last_seen_at' => now(),
-        ]);
+        $this->markDeviceSeen($device);
 
         if ($command->device_id !== $device->id) {
             return response()->json([
@@ -214,8 +209,27 @@ class DeviceCommandController extends Controller
         return response()->json([
             'message' => 'Command status updated successfully.',
             'command_id' => $command->id,
+            'command_type' => $command->command_type,
             'status' => $command->fresh()->status,
+            'execution_meaning' => $this->executionMeaning($command),
         ]);
+    }
+
+    private function markDeviceSeen(Device $device): void
+    {
+        $device->update([
+            'status' => in_array($device->status, ['claimed', 'claimed_pending_wifi'], true) ? 'active' : $device->status,
+            'last_seen_at' => now(),
+        ]);
+    }
+
+    private function executionMeaning(DeviceCommand $command): string
+    {
+        return match ($command->command_type) {
+            'valve_on', 'valve_off' => 'For timed watering commands, executed means the watering action completed.',
+            'output_set', 'scene_apply' => 'For persistent state commands, executed means the requested state was applied.',
+            default => 'Executed means the device completed the command according to its command type.',
+        };
     }
 
     private function cleanupStaleCommands(Device $device): void
@@ -230,13 +244,15 @@ class DeviceCommandController extends Controller
                 'status' => 'expired',
             ]);
 
-            WateringLog::where('device_command_id', $command->id)
-                ->where('status', 'requested')
-                ->update([
-                    'status' => 'failed',
-                    'ended_at' => now(),
-                    'notes' => 'Command expired before device confirmation.',
-                ]);
+            if (in_array($command->command_type, ['valve_on', 'valve_off'], true)) {
+                WateringLog::where('device_command_id', $command->id)
+                    ->where('status', 'requested')
+                    ->update([
+                        'status' => 'failed',
+                        'ended_at' => now(),
+                        'notes' => 'Command expired before device confirmation.',
+                    ]);
+            }
         }
 
         $acknowledgedCommands = DeviceCommand::where('device_id', $device->id)
@@ -259,6 +275,11 @@ class DeviceCommandController extends Controller
                     && $command->acknowledged_at->copy()->addSeconds(60)->isPast();
             }
 
+            if (in_array($command->command_type, ['output_set', 'scene_apply'], true)) {
+                $timedOut = $command->acknowledged_at
+                    && $command->acknowledged_at->copy()->addSeconds(60)->isPast();
+            }
+
             if (! $timedOut) {
                 continue;
             }
@@ -266,6 +287,10 @@ class DeviceCommandController extends Controller
             $command->update([
                 'status' => 'failed',
             ]);
+
+            if (! in_array($command->command_type, ['valve_on', 'valve_off'], true)) {
+                continue;
+            }
 
             $log = WateringLog::where('device_command_id', $command->id)->latest('id')->first();
 
