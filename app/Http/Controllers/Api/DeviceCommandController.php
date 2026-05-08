@@ -189,6 +189,10 @@ class DeviceCommandController extends Controller
                         'executed_at' => now(),
                     ]);
             }
+
+            if ($command->command_type === 'output_set') {
+                $this->applyOutputSetCommand($device, $command);
+            }
         }
 
         if ($validated['status'] === 'failed') {
@@ -212,6 +216,30 @@ class DeviceCommandController extends Controller
             'command_type' => $command->command_type,
             'status' => $command->fresh()->status,
             'execution_meaning' => $this->executionMeaning($command),
+        ]);
+    }
+
+    private function applyOutputSetCommand(Device $device, DeviceCommand $command): void
+    {
+        $outputKey = data_get($command->payload, 'output');
+        $state = data_get($command->payload, 'state');
+
+        if (! is_string($outputKey) || ! is_array($state)) {
+            return;
+        }
+
+        $deviceOutput = $device->outputs()
+            ->where('key', $outputKey)
+            ->first();
+
+        if (! $deviceOutput) {
+            return;
+        }
+
+        $deviceOutput->update([
+            'state' => array_merge($deviceOutput->state ?? [], $state),
+            'last_changed_source' => data_get($command->payload, 'source', 'device_ack'),
+            'last_changed_at' => now(),
         ]);
     }
 
