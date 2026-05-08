@@ -42,7 +42,7 @@
         <div class="grid gap-6 md:grid-cols-2">
             <div class="rounded-lg bg-white p-6 shadow">
                 @if ($device->isSmartFountain())
-                    <h2 class="mb-4 text-xl font-semibold">Platform Readings</h2>
+                    <h2 class="mb-4 text-xl font-semibold">Device Readings</h2>
 
                     @forelse($platformReadings as $reading)
                     <div class="border-b py-3 last:border-b-0">
@@ -53,7 +53,7 @@
                         <pre class="overflow-x-auto rounded bg-gray-100 p-3 text-sm">{{ json_encode($reading->metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
                     </div>
                     @empty
-                    <p class="text-gray-500">No platform readings found.</p>
+                    <p class="text-gray-500">No device readings found.</p>
                     @endforelse
 
                     <div class="mt-4">
