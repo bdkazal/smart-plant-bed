@@ -25,8 +25,6 @@ Do **not** confuse account/device lifecycle status with live hardware connection
 Stored in:
 
 ```text
-users/devices ownership flow
-
 devices.status
 ```
 
@@ -77,31 +75,7 @@ Meaning:
 - `Online` = hardware contacted Laravel recently.
 - `Offline` = hardware has not contacted Laravel recently.
 
-This connection status belongs on the individual device dashboard.
-
-### Correct UI behavior
-
-On the **My Devices** list page:
-
-```text
-Smart Fountain Test 01
-Status: Active
-Last Seen: Never / 3 hours ago
-```
-
-This uses `devices.status`.
-
-On the **device dashboard** page:
-
-```text
-Top badge: Online / Offline
-Device Status card: Online / Offline
-Last Seen: Never / time ago
-```
-
-This uses `last_seen_at` freshness.
-
-Therefore, this is valid and expected:
+Correct expected UI behavior:
 
 ```text
 My Devices page: Active
@@ -141,6 +115,221 @@ App\Models\Device::find($id)->update(['status' => 'active']);
 ```
 
 This is acceptable during backend development. Hardware connection can be tested later with heartbeat/state API calls.
+
+---
+
+## Critical Platform Rule: Timed Action Devices vs Persistent State Devices
+
+The platform must not treat every product like the Smart Plant Bed.
+
+There are two main control behavior types.
+
+### 1. Timed Action Devices
+
+Used by products such as:
+
+```text
+Smart Plant Bed
+Smart Planter watering
+future fertilizer/dosing devices
+```
+
+Behavior:
+
+```text
+start action
+run for a duration
+stop automatically
+respect safety max runtime
+respect cooldown before next automatic run
+```
+
+Plant Bed example:
+
+```text
+Water for 30 seconds.
+Do not exceed 300 seconds.
+Do not water again for 60 minutes after an auto run.
+```
+
+These products need:
+
+```text
+duration_seconds
+max_runtime_seconds
+cooldown_minutes
+safety stop
+watering/action logs
+auto trigger protection
+```
+
+Current Plant Bed commands:
+
+```text
+valve_on
+valve_off
+```
+
+For timed action devices:
+
+```text
+executed = the timed action completed
+```
+
+So for Plant Bed, `valve_on` becoming `executed` means the watering run is done and the valve/pump has been turned off after the requested duration.
+
+### 2. Persistent State Devices
+
+Used by products such as:
+
+```text
+Smart Fountain
+Fan & Light Controller
+Smart Bathroom Controller outputs
+RGB/light/pump/fan devices
+```
+
+Behavior:
+
+```text
+set output state
+keep that state until another command changes it
+```
+
+Examples:
+
+```text
+Pump ON at 60%
+Light ON at 40%
+Fan ON
+RGB warm_glow
+```
+
+These products generally do **not** use Plant Bed-style runtime duration/cooldown for normal operation.
+
+They need:
+
+```text
+current output state
+manual on/off
+schedule time ranges
+sensor automation
+scene apply
+```
+
+Generic platform commands:
+
+```text
+output_set
+scene_apply
+```
+
+For persistent state devices:
+
+```text
+executed = the requested state was applied
+```
+
+It does **not** mean the output finished running.
+
+Example:
+
+```json
+{
+  "command_type": "output_set",
+  "payload": {
+    "output": "pump",
+    "state": {
+      "enabled": true,
+      "speed_percent": 60
+    },
+    "source": "dashboard"
+  }
+}
+```
+
+For a Smart Fountain, when this command becomes `executed`, it means:
+
+```text
+the device applied pump ON at 60%
+```
+
+The pump should continue running until another command changes the state:
+
+```json
+{
+  "command_type": "output_set",
+  "payload": {
+    "output": "pump",
+    "state": {
+      "enabled": false,
+      "speed_percent": 0
+    },
+    "source": "dashboard"
+  }
+}
+```
+
+### Schedule difference
+
+Plant Bed schedule:
+
+```text
+Monday 06:00
+Water for 30 seconds
+```
+
+This is an instant trigger with a duration.
+
+Smart Fountain / Fan / Bathroom schedule:
+
+```text
+Every day 06:00 to 20:00
+Apply daytime scene/state
+After 20:00 apply off/night scene
+```
+
+This is a time range / state range.
+
+Future generic schedule design should support at least:
+
+```text
+timed_action
+state_range
+```
+
+### Bathroom Controller difference
+
+A Smart Bathroom Controller is still mostly a persistent state device, but it has sensor automation rules on top.
+
+Outputs may include:
+
+```text
+bathroom_light
+exhaust_fan
+night_light
+optional_rgb_light
+```
+
+Sensors/readings may include:
+
+```text
+presence
+humidity
+temperature
+ambient_light
+```
+
+Automation examples:
+
+```text
+Human detected → light ON
+No human for 5 minutes → light OFF
+Humidity >= 75% → exhaust fan ON
+Humidity <= 60% for 5 minutes → exhaust fan OFF
+```
+
+The auto-off is not the same as Plant Bed's watering runtime. It is a later automation decision that sends another `output_set` command to turn the output off.
 
 ---
 
@@ -190,6 +379,7 @@ soil_moisture_sensor
 battery_status
 relay_output
 humidity_sensor
+presence_sensor
 ```
 
 ### Outputs
@@ -235,6 +425,8 @@ temperature
 humidity
 battery_percent
 battery_voltage
+presence
+ambient_light
 ```
 
 The older `sensor_readings` table still exists for the current Plant Bed flow and should not be removed until the platform migration is mature.
@@ -243,7 +435,7 @@ The older `sensor_readings` table still exists for the current Plant Bed flow an
 
 ## Smart Fountain Platform Notes
 
-The Smart Fountain uses the platform model.
+The Smart Fountain uses the persistent state platform model.
 
 Device type:
 
@@ -313,6 +505,7 @@ The Laravel side already includes:
   - `device_outputs`
   - `device_readings`
   - `devices.last_reported_state`
+- early Smart Fountain dashboard using generic `output_set` commands
 
 The ESP32/device-side runtime logic is designed after the Laravel/API contract is stable.
 
@@ -331,133 +524,74 @@ The MVP should stay simple, practical, and expandable.
 
 ---
 
-## Current MVP Scope
-
-### Monitoring
-
-- latest temperature
-- latest humidity
-- latest soil moisture
-- device last seen time
-- device online / offline status
-
-### Manual Control
-
-- start watering from dashboard
-- stop watering from dashboard
-- block manual control when device is offline
-
-### Scheduled Watering
-
-- create, edit, enable/disable, and delete schedules
-- timezone-aware schedule execution
-- schedule mode is separate from auto mode
-
-### Auto Watering
-
-- trigger watering when soil moisture goes below threshold
-- configurable threshold
-- configurable max watering duration
-- configurable cooldown period
-- auto mode requires a valid moisture reading
-
----
-
-## Current Architecture
-
-## Device Side
-
-Planned ESP32 device responsibilities:
-
-- read sensor values
-- send sensor readings to Laravel API
-- poll Laravel for pending commands
-- acknowledge commands
-- execute watering commands
-- send final command result
-- send heartbeat / presence updates
-- cache last known config for offline-capable device behavior later
-
-## Laravel Side
-
-Laravel currently handles:
-
-- user auth
-- claimed device ownership
-- dashboard pages
-- device settings
-- watering rules
-- watering schedules
-- sensor reading storage
-- command creation
-- command state transitions
-- command timeout cleanup
-- online / offline status using recent device contact
-
-## Frontend
-
-Current frontend is server-rendered Blade with light JavaScript polling for status refresh.
-
----
-
 ## Current Watering Model
 
-The project currently uses two separate concepts:
+The Smart Plant Bed currently uses two separate concepts:
 
 ### 1. Automation Mode
 
 This is the configured operating mode:
 
-- `auto`
-- `schedule`
+```text
+auto
+schedule
+```
 
 ### 2. Watering State
 
 This is the current watering action state shown on the dashboard:
 
-- `idle`
-- `waiting`
-- `watering`
-- `stopping`
+```text
+idle
+waiting
+watering
+stopping
+```
 
-Manual watering is **not** a persistent mode.  
-Manual watering is a direct user action / trigger source.
+Manual watering is **not** a persistent mode. Manual watering is a direct user action / trigger source.
 
 ---
 
 ## Current Command Lifecycle
 
-The backend currently supports a stricter command lifecycle for watering commands.
+The backend supports this command lifecycle:
 
-### Command statuses
+```text
+pending
+acknowledged
+executed
+failed
+expired
+```
 
-- `pending`
-- `acknowledged`
-- `executed`
-- `failed`
-- `expired`
+Current rules:
 
-### Current rules
-
-- `pending -> acknowledged`
-- `pending -> failed`
-- `acknowledged -> executed`
-- `acknowledged -> failed`
+```text
+pending -> acknowledged
+pending -> failed
+acknowledged -> executed
+acknowledged -> failed
+```
 
 Closed commands are protected from late updates:
 
-- `expired`
-- `failed`
-- `executed`
+```text
+expired
+failed
+executed
+```
 
 These closed states cannot be changed later by a reconnecting device.
 
-### Timeout behavior
+Command status meaning depends on device behavior type:
 
-- `pending` commands expire after a short timeout if the device never confirms
-- `acknowledged` commands fail after timeout if the device never reports completion
+```text
+Timed action device:
+executed = timed action completed
 
-This protects the system from stale commands and broken device/network sessions.
+Persistent state device:
+executed = requested state applied
+```
 
 ---
 
@@ -471,126 +605,104 @@ The device is considered online when it contacts the server recently through end
 - command polling
 - command acknowledgement
 - heartbeat endpoint
-
-The dashboard checks current status by polling Laravel periodically.
+- state sync endpoint
 
 This is the current MVP presence strategy before websocket/MQTT complexity.
 
 ---
 
-## Current Pages
+## API Endpoints
 
-### Device Home
+The current backend/device contract uses:
 
-Shows:
+```http
+GET  /api/device/config
+POST /api/device/readings
+GET  /api/device/commands
+POST /api/device/commands/{command}/ack
+POST /api/device/heartbeat
+POST /api/device/state
+```
 
-- online / offline
-- latest reading
-- watering state
-- current automation mode
-- manual start / stop controls
-- started-by context when watering is active
+Device authentication uses:
 
-### Automation
+```http
+X-DEVICE-KEY: <device_api_key>
+```
 
-Shows:
+The device identifies itself using:
 
-- device settings
-- timezone
-- automation mode
-- moisture threshold
-- cooldown
-- watering durations
-
-### Schedules
-
-Supports full CRUD for watering schedules.
-
-### History
-
-Shows:
-
-- recent watering logs
-- recent device commands
-- paginated history
-
----
-
-## API Endpoints (Current Direction)
-
-### Device config
-
-- device fetches latest config/rules/settings
-
-### Device readings
-
-- device posts temperature / humidity / soil moisture
-- Laravel stores readings
-- Laravel may trigger auto watering if conditions match
-
-### Device commands
-
-- device polls for pending commands
-- device acknowledges command lifecycle updates
-
-### Device heartbeat
-
-- device updates its presence / last seen timestamp
-
----
-
-## Current Business / Product Design Decisions
-
-### Keep V1 simple
-
-Do not overbuild the MVP.
-
-### Manual control should feel reliable
-
-If the device is offline, manual start/stop should not be offered as if it were immediately available.
-
-### Auto and schedule are separate
-
-The current design treats:
-
-- auto mode
-- schedule mode
-
-as distinct automation modes.
-
-### Manual control is always a direct user action
-
-Manual is not stored as a persistent mode.
+```json
+{
+  "device_uuid": "..."
+}
+```
 
 ---
 
 ## Known Incomplete Areas
 
-The Laravel side is strong enough for MVP progress, but the project is **not finished**.
-
 Important unfinished areas:
 
-### 1. Device State Sync / Reconnect Reconciliation
+### 1. Platform State Sync
 
-Goal:
-When the device reconnects after being offline, Laravel should learn the device’s real current state again without blindly rewriting old closed command history.
+For new persistent state devices, `/api/device/state` should support platform-style output states and generic readings.
 
-This should be a separate state-sync flow, not a rewrite of closed command history.
+Desired Smart Fountain state shape:
 
-### 2. ESP32 Runtime Design
+```json
+{
+  "device_uuid": "...",
+  "device_type": "smart_fountain",
+  "firmware_version": "fountain-dev-0.1",
+  "operation_state": "running",
+  "outputs": {
+    "pump": {
+      "enabled": true,
+      "speed_percent": 60,
+      "source": "dashboard"
+    },
+    "cob_light": {
+      "enabled": true,
+      "brightness_percent": 30,
+      "source": "dashboard"
+    },
+    "rgb_light": {
+      "enabled": true,
+      "brightness_percent": 40,
+      "color": "#FFB066",
+      "effect": "warm_glow",
+      "source": "dashboard"
+    }
+  },
+  "readings": {
+    "water_level_percent": {
+      "value": 75,
+      "unit": "percent"
+    },
+    "water_low": {
+      "value": 0,
+      "unit": "boolean"
+    }
+  }
+}
+```
 
-The detailed device-side control loop still needs to be designed clearly:
+### 2. Generic Schedules / Scenes
 
-- polling frequency
-- heartbeat frequency
-- ack flow
-- execution flow
-- offline fallback behavior
-- local control rules
+Plant Bed currently has watering schedules. Persistent state devices need state-range schedules and scenes.
 
-### 3. UI Cleanup / Product Polish
+Future direction:
 
-The dashboard is usable, but still needs polish and simplification.
+```text
+device_schedules
+device_scenes
+device_automation_rules
+```
+
+### 3. ESP32 Runtime Design Per Product
+
+The detailed device-side control loop should be designed per product after the Laravel/API contract is stable.
 
 ---
 
@@ -612,6 +724,7 @@ Not MVP priorities, but possible later:
 - billing / subscriptions
 - device-to-device automation rules
 - reusable scene engine
+- generic schedule engine
 
 ---
 
@@ -653,5 +766,8 @@ When opening a new thread for a new device, preserve these platform rules:
 - do not design a separate product-specific Laravel app
 - use `devices.status` for account/device lifecycle
 - use `last_seen_at` freshness for online/offline connection state
+- distinguish timed action devices from persistent state devices
+- use `executed = completed` only for timed action devices
+- use `executed = state applied` for persistent state devices
 - use capabilities/outputs/readings for new device types
 - keep existing Plant Bed functionality working while adding platform features
