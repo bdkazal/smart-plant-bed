@@ -127,163 +127,154 @@
             </div>
         </div>
 
-        <div class="mt-4 grid gap-4 md:grid-cols-3">
-            <div class="rounded-lg bg-white p-5 shadow">
-                <h2 class="mb-3 text-lg font-semibold">Pump</h2>
-                <p><strong>State:</strong> <span id="pump-state">{{ data_get($pump?->state, 'enabled') ? 'ON' : 'OFF' }}</span></p>
-                <p><strong>Speed:</strong> <span id="pump-speed">{{ data_get($pump?->state, 'speed_percent', 0) }}%</span></p>
-                <p><strong>Source:</strong> <span id="pump-source">{{ $pump?->last_changed_source ?? 'N/A' }}</span></p>
-                <p class="mt-2">
-                    <strong>Last Command:</strong>
-                    <span id="pump-command" data-command-badge class="rounded-full px-2 py-1 text-xs {{ $commandClass($pumpCommand) }}">
-                        {{ $commandLabel($pumpCommand) }}
-                    </span>
-                </p>
-            </div>
-
-            <div class="rounded-lg bg-white p-5 shadow">
-                <h2 class="mb-3 text-lg font-semibold">COB Light</h2>
-                <p><strong>State:</strong> <span id="cob-light-state">{{ data_get($cobLight?->state, 'enabled') ? 'ON' : 'OFF' }}</span></p>
-                <p><strong>Brightness:</strong> <span id="cob-light-brightness">{{ data_get($cobLight?->state, 'brightness_percent', 0) }}%</span></p>
-                <p><strong>Source:</strong> <span id="cob-light-source">{{ $cobLight?->last_changed_source ?? 'N/A' }}</span></p>
-                <p class="mt-2">
-                    <strong>Last Command:</strong>
-                    <span id="cob-light-command" data-command-badge class="rounded-full px-2 py-1 text-xs {{ $commandClass($cobLightCommand) }}">
-                        {{ $commandLabel($cobLightCommand) }}
-                    </span>
-                </p>
-            </div>
-
-            <div class="rounded-lg bg-white p-5 shadow">
-                <h2 class="mb-3 text-lg font-semibold">RGB Light</h2>
-                <p><strong>State:</strong> <span id="rgb-light-state">{{ data_get($rgbLight?->state, 'enabled') ? 'ON' : 'OFF' }}</span></p>
-                <p><strong>Brightness:</strong> <span id="rgb-light-brightness">{{ data_get($rgbLight?->state, 'brightness_percent', 0) }}%</span></p>
-                <p><strong>Color:</strong> <span id="rgb-light-color">{{ data_get($rgbLight?->state, 'color', 'N/A') }}</span></p>
-                <p><strong>Effect:</strong> <span id="rgb-light-effect">{{ str_replace('_', ' ', data_get($rgbLight?->state, 'effect', 'N/A')) }}</span></p>
-                <p><strong>Source:</strong> <span id="rgb-light-source">{{ $rgbLight?->last_changed_source ?? 'N/A' }}</span></p>
-                <p class="mt-2">
-                    <strong>Last Command:</strong>
-                    <span id="rgb-light-command" data-command-badge class="rounded-full px-2 py-1 text-xs {{ $commandClass($rgbLightCommand) }}">
-                        {{ $commandLabel($rgbLightCommand) }}
-                    </span>
-                </p>
-            </div>
+        <div id="offline-note" class="{{ $isOnline ? 'hidden' : '' }} mt-4 rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-800">
+            Device is offline. Live output commands are still enabled for backend testing; before customer release, this should be changed to block live controls while offline.
         </div>
 
-        <div class="mt-4 rounded-lg bg-white p-5 shadow">
-            <h2 class="mb-3 text-lg font-semibold">Smart Fountain Controls</h2>
-
-            @if ($device->status !== 'active')
-                <div class="rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-800">
-                    This device is not active in the account yet. Output commands are disabled.
-                </div>
-            @else
-                @if (! $isOnline)
-                    <div id="offline-note" class="mb-4 rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-800">
-                        Device is offline. These controls will still create pending Laravel commands for backend testing; real hardware will apply them when it connects and polls commands.
+        @if ($device->status !== 'active')
+            <div class="mt-4 rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-800">
+                This device is not active in the account yet. Output commands are disabled.
+            </div>
+        @else
+            <div class="mt-4 grid gap-4 md:grid-cols-3">
+                <form method="POST" action="{{ route('devices.outputs.set', [$device, 'pump']) }}" class="rounded-lg bg-white p-5 shadow">
+                    @csrf
+                    <div class="mb-4 flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-semibold">Pump Control</h2>
+                            <p class="text-sm text-gray-500">Water pump output</p>
+                        </div>
+                        <span id="pump-command" class="rounded-full px-2 py-1 text-xs {{ $commandClass($pumpCommand) }}">
+                            {{ $commandLabel($pumpCommand) }}
+                        </span>
                     </div>
-                @else
-                    <div id="offline-note" class="hidden mb-4 rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-800">
-                        Device is offline. These controls will still create pending Laravel commands for backend testing; real hardware will apply them when it connects and polls commands.
+
+                    <div class="mb-4 rounded border border-gray-200 bg-gray-50 px-4 py-3">
+                        <p><strong>Current State:</strong> <span id="pump-state">{{ data_get($pump?->state, 'enabled') ? 'ON' : 'OFF' }}</span></p>
+                        <p><strong>Speed:</strong> <span id="pump-speed">{{ data_get($pump?->state, 'speed_percent', 0) }}%</span></p>
+                        <p><strong>Source:</strong> <span id="pump-source">{{ $pump?->last_changed_source ?? 'N/A' }}</span></p>
                     </div>
-                @endif
 
-                <div class="grid gap-4 md:grid-cols-3">
-                    <form method="POST" action="{{ route('devices.outputs.set', [$device, 'pump']) }}" class="rounded border p-4">
-                        @csrf
-                        <h3 class="mb-3 font-semibold">Pump Control</h3>
+                    <label class="mb-3 flex items-center gap-2">
+                        <input id="pump-enabled-input" type="checkbox" name="enabled" value="1" {{ data_get($pump?->state, 'enabled') ? 'checked' : '' }}>
+                        <span>Enable pump</span>
+                    </label>
 
-                        <label class="mb-3 flex items-center gap-2">
-                            <input id="pump-enabled-input" type="checkbox" name="enabled" value="1" {{ data_get($pump?->state, 'enabled') ? 'checked' : '' }}>
-                            <span>Enable pump</span>
-                        </label>
+                    <label for="pump_speed_percent" class="mb-1 block text-sm font-medium">Speed (%)</label>
+                    <input
+                        id="pump_speed_percent"
+                        type="number"
+                        name="speed_percent"
+                        min="0"
+                        max="100"
+                        value="{{ old('speed_percent', data_get($pump?->state, 'speed_percent', 0)) }}"
+                        class="mb-3 w-full rounded border px-3 py-2"
+                        required>
 
-                        <label for="pump_speed_percent" class="mb-1 block text-sm font-medium">Speed (%)</label>
-                        <input
-                            id="pump_speed_percent"
-                            type="number"
-                            name="speed_percent"
-                            min="0"
-                            max="100"
-                            value="{{ old('speed_percent', data_get($pump?->state, 'speed_percent', 0)) }}"
-                            class="mb-3 w-full rounded border px-3 py-2"
-                            required>
+                    <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+                        Send Pump Command
+                    </button>
+                </form>
 
-                        <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
-                            Send Pump Command
-                        </button>
-                    </form>
+                <form method="POST" action="{{ route('devices.outputs.set', [$device, 'cob_light']) }}" class="rounded-lg bg-white p-5 shadow">
+                    @csrf
+                    <div class="mb-4 flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-semibold">COB Light Control</h2>
+                            <p class="text-sm text-gray-500">Main white light</p>
+                        </div>
+                        <span id="cob-light-command" class="rounded-full px-2 py-1 text-xs {{ $commandClass($cobLightCommand) }}">
+                            {{ $commandLabel($cobLightCommand) }}
+                        </span>
+                    </div>
 
-                    <form method="POST" action="{{ route('devices.outputs.set', [$device, 'cob_light']) }}" class="rounded border p-4">
-                        @csrf
-                        <h3 class="mb-3 font-semibold">COB Light Control</h3>
+                    <div class="mb-4 rounded border border-gray-200 bg-gray-50 px-4 py-3">
+                        <p><strong>Current State:</strong> <span id="cob-light-state">{{ data_get($cobLight?->state, 'enabled') ? 'ON' : 'OFF' }}</span></p>
+                        <p><strong>Brightness:</strong> <span id="cob-light-brightness">{{ data_get($cobLight?->state, 'brightness_percent', 0) }}%</span></p>
+                        <p><strong>Source:</strong> <span id="cob-light-source">{{ $cobLight?->last_changed_source ?? 'N/A' }}</span></p>
+                    </div>
 
-                        <label class="mb-3 flex items-center gap-2">
-                            <input id="cob-light-enabled-input" type="checkbox" name="enabled" value="1" {{ data_get($cobLight?->state, 'enabled') ? 'checked' : '' }}>
-                            <span>Enable COB light</span>
-                        </label>
+                    <label class="mb-3 flex items-center gap-2">
+                        <input id="cob-light-enabled-input" type="checkbox" name="enabled" value="1" {{ data_get($cobLight?->state, 'enabled') ? 'checked' : '' }}>
+                        <span>Enable COB light</span>
+                    </label>
 
-                        <label for="cob_brightness_percent" class="mb-1 block text-sm font-medium">Brightness (%)</label>
-                        <input
-                            id="cob_brightness_percent"
-                            type="number"
-                            name="brightness_percent"
-                            min="0"
-                            max="100"
-                            value="{{ old('brightness_percent', data_get($cobLight?->state, 'brightness_percent', 0)) }}"
-                            class="mb-3 w-full rounded border px-3 py-2"
-                            required>
+                    <label for="cob_brightness_percent" class="mb-1 block text-sm font-medium">Brightness (%)</label>
+                    <input
+                        id="cob_brightness_percent"
+                        type="number"
+                        name="brightness_percent"
+                        min="0"
+                        max="100"
+                        value="{{ old('brightness_percent', data_get($cobLight?->state, 'brightness_percent', 0)) }}"
+                        class="mb-3 w-full rounded border px-3 py-2"
+                        required>
 
-                        <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
-                            Send COB Command
-                        </button>
-                    </form>
+                    <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+                        Send COB Command
+                    </button>
+                </form>
 
-                    <form method="POST" action="{{ route('devices.outputs.set', [$device, 'rgb_light']) }}" class="rounded border p-4">
-                        @csrf
-                        <h3 class="mb-3 font-semibold">RGB Light Control</h3>
+                <form method="POST" action="{{ route('devices.outputs.set', [$device, 'rgb_light']) }}" class="rounded-lg bg-white p-5 shadow">
+                    @csrf
+                    <div class="mb-4 flex items-start justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-semibold">RGB Light Control</h2>
+                            <p class="text-sm text-gray-500">Decorative light</p>
+                        </div>
+                        <span id="rgb-light-command" class="rounded-full px-2 py-1 text-xs {{ $commandClass($rgbLightCommand) }}">
+                            {{ $commandLabel($rgbLightCommand) }}
+                        </span>
+                    </div>
 
-                        <label class="mb-3 flex items-center gap-2">
-                            <input id="rgb-light-enabled-input" type="checkbox" name="enabled" value="1" {{ data_get($rgbLight?->state, 'enabled') ? 'checked' : '' }}>
-                            <span>Enable RGB light</span>
-                        </label>
+                    <div class="mb-4 rounded border border-gray-200 bg-gray-50 px-4 py-3">
+                        <p><strong>Current State:</strong> <span id="rgb-light-state">{{ data_get($rgbLight?->state, 'enabled') ? 'ON' : 'OFF' }}</span></p>
+                        <p><strong>Brightness:</strong> <span id="rgb-light-brightness">{{ data_get($rgbLight?->state, 'brightness_percent', 0) }}%</span></p>
+                        <p><strong>Color:</strong> <span id="rgb-light-color">{{ data_get($rgbLight?->state, 'color', 'N/A') }}</span></p>
+                        <p><strong>Effect:</strong> <span id="rgb-light-effect">{{ str_replace('_', ' ', data_get($rgbLight?->state, 'effect', 'N/A')) }}</span></p>
+                        <p><strong>Source:</strong> <span id="rgb-light-source">{{ $rgbLight?->last_changed_source ?? 'N/A' }}</span></p>
+                    </div>
 
-                        <label for="rgb_brightness_percent" class="mb-1 block text-sm font-medium">Brightness (%)</label>
-                        <input
-                            id="rgb_brightness_percent"
-                            type="number"
-                            name="brightness_percent"
-                            min="0"
-                            max="100"
-                            value="{{ old('brightness_percent', data_get($rgbLight?->state, 'brightness_percent', 0)) }}"
-                            class="mb-3 w-full rounded border px-3 py-2"
-                            required>
+                    <label class="mb-3 flex items-center gap-2">
+                        <input id="rgb-light-enabled-input" type="checkbox" name="enabled" value="1" {{ data_get($rgbLight?->state, 'enabled') ? 'checked' : '' }}>
+                        <span>Enable RGB light</span>
+                    </label>
 
-                        <label for="rgb_color" class="mb-1 block text-sm font-medium">Color</label>
-                        <input
-                            id="rgb_color"
-                            type="color"
-                            name="color"
-                            value="{{ old('color', data_get($rgbLight?->state, 'color', '#FFB066')) }}"
-                            class="mb-3 h-10 w-full rounded border px-2 py-1"
-                            required>
+                    <label for="rgb_brightness_percent" class="mb-1 block text-sm font-medium">Brightness (%)</label>
+                    <input
+                        id="rgb_brightness_percent"
+                        type="number"
+                        name="brightness_percent"
+                        min="0"
+                        max="100"
+                        value="{{ old('brightness_percent', data_get($rgbLight?->state, 'brightness_percent', 0)) }}"
+                        class="mb-3 w-full rounded border px-3 py-2"
+                        required>
 
-                        <label for="rgb_effect" class="mb-1 block text-sm font-medium">Effect</label>
-                        <select id="rgb_effect" name="effect" class="mb-3 w-full rounded border px-3 py-2" required>
-                            @foreach (['solid', 'breathing', 'slow_rainbow', 'warm_glow', 'water_shimmer', 'night_mode'] as $effect)
-                                <option value="{{ $effect }}" @selected(old('effect', data_get($rgbLight?->state, 'effect', 'warm_glow')) === $effect)>
-                                    {{ ucwords(str_replace('_', ' ', $effect)) }}
-                                </option>
-                            @endforeach
-                        </select>
+                    <label for="rgb_color" class="mb-1 block text-sm font-medium">Color</label>
+                    <input
+                        id="rgb_color"
+                        type="color"
+                        name="color"
+                        value="{{ old('color', data_get($rgbLight?->state, 'color', '#FFB066')) }}"
+                        class="mb-3 h-10 w-full rounded border px-2 py-1"
+                        required>
 
-                        <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
-                            Send RGB Command
-                        </button>
-                    </form>
-                </div>
-            @endif
-        </div>
+                    <label for="rgb_effect" class="mb-1 block text-sm font-medium">Effect</label>
+                    <select id="rgb_effect" name="effect" class="mb-3 w-full rounded border px-3 py-2" required>
+                        @foreach (['solid', 'breathing', 'slow_rainbow', 'warm_glow', 'water_shimmer', 'night_mode'] as $effect)
+                            <option value="{{ $effect }}" @selected(old('effect', data_get($rgbLight?->state, 'effect', 'warm_glow')) === $effect)>
+                                {{ ucwords(str_replace('_', ' ', $effect)) }}
+                            </option>
+                        @endforeach
+                    </select>
+
+                    <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+                        Send RGB Command
+                    </button>
+                </form>
+            </div>
+        @endif
     </div>
 
     <script>
@@ -389,7 +380,7 @@
             setText('rgb-light-state', rgbState.enabled ? 'ON' : 'OFF');
             setText('rgb-light-brightness', `${rgbState.brightness_percent ?? 0}%`);
             setText('rgb-light-color', rgbState.color ?? 'N/A');
-            setText('rgb-light-effect', (rgbState.effect ?? 'N/A').replaceAll('_', ' '));
+            setText('rgb-light-effect', (rgbState.effect ?? 'N/A').replace(/_/g, ' '));
             setText('rgb-light-source', rgb.last_changed_source ?? 'N/A');
             updateCommandBadge('rgb-light-command', rgb.last_command);
             setCheckbox('rgb-light-enabled-input', rgbState.enabled);
