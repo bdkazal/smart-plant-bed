@@ -48,6 +48,46 @@
 
             $waterLow = $latestReadings->get('water_low')?->value;
             $waterLevel = $latestReadings->get('water_level_percent')?->value;
+
+            $latestCommandFor = function (string $outputKey) use ($device) {
+                return $device->deviceCommands->first(function ($command) use ($outputKey) {
+                    return $command->command_type === 'output_set'
+                        && data_get($command->payload, 'output') === $outputKey;
+                });
+            };
+
+            $commandLabel = function ($command) {
+                if (! $command) {
+                    return 'None yet';
+                }
+
+                return match ($command->status) {
+                    'pending' => 'Waiting for device',
+                    'acknowledged' => 'Applying',
+                    'executed' => 'Applied',
+                    'failed' => 'Failed',
+                    'expired' => 'Expired',
+                    default => ucfirst($command->status),
+                };
+            };
+
+            $commandClass = function ($command) {
+                if (! $command) {
+                    return 'bg-gray-100 text-gray-700';
+                }
+
+                return match ($command->status) {
+                    'pending' => 'bg-yellow-100 text-yellow-800',
+                    'acknowledged' => 'bg-blue-100 text-blue-800',
+                    'executed' => 'bg-green-100 text-green-800',
+                    'failed', 'expired' => 'bg-red-100 text-red-800',
+                    default => 'bg-gray-100 text-gray-700',
+                };
+            };
+
+            $pumpCommand = $latestCommandFor('pump');
+            $cobLightCommand = $latestCommandFor('cob_light');
+            $rgbLightCommand = $latestCommandFor('rgb_light');
         @endphp
 
         <div class="grid gap-4 md:grid-cols-2">
@@ -93,6 +133,12 @@
                 <p><strong>State:</strong> {{ data_get($pump?->state, 'enabled') ? 'ON' : 'OFF' }}</p>
                 <p><strong>Speed:</strong> {{ data_get($pump?->state, 'speed_percent', 0) }}%</p>
                 <p><strong>Source:</strong> {{ $pump?->last_changed_source ?? 'N/A' }}</p>
+                <p class="mt-2">
+                    <strong>Last Command:</strong>
+                    <span class="rounded-full px-2 py-1 text-xs {{ $commandClass($pumpCommand) }}">
+                        {{ $commandLabel($pumpCommand) }}
+                    </span>
+                </p>
             </div>
 
             <div class="rounded-lg bg-white p-5 shadow">
@@ -100,6 +146,12 @@
                 <p><strong>State:</strong> {{ data_get($cobLight?->state, 'enabled') ? 'ON' : 'OFF' }}</p>
                 <p><strong>Brightness:</strong> {{ data_get($cobLight?->state, 'brightness_percent', 0) }}%</p>
                 <p><strong>Source:</strong> {{ $cobLight?->last_changed_source ?? 'N/A' }}</p>
+                <p class="mt-2">
+                    <strong>Last Command:</strong>
+                    <span class="rounded-full px-2 py-1 text-xs {{ $commandClass($cobLightCommand) }}">
+                        {{ $commandLabel($cobLightCommand) }}
+                    </span>
+                </p>
             </div>
 
             <div class="rounded-lg bg-white p-5 shadow">
@@ -109,6 +161,12 @@
                 <p><strong>Color:</strong> {{ data_get($rgbLight?->state, 'color', 'N/A') }}</p>
                 <p><strong>Effect:</strong> {{ str_replace('_', ' ', data_get($rgbLight?->state, 'effect', 'N/A')) }}</p>
                 <p><strong>Source:</strong> {{ $rgbLight?->last_changed_source ?? 'N/A' }}</p>
+                <p class="mt-2">
+                    <strong>Last Command:</strong>
+                    <span class="rounded-full px-2 py-1 text-xs {{ $commandClass($rgbLightCommand) }}">
+                        {{ $commandLabel($rgbLightCommand) }}
+                    </span>
+                </p>
             </div>
         </div>
 
