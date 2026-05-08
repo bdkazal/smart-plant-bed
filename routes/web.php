@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DeviceClaimController;
 use App\Http\Controllers\DeviceController;
+use App\Http\Controllers\SmartFountainStatusController;
 use App\Http\Controllers\WateringScheduleController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -25,6 +26,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/devices/{device}', [DeviceController::class, 'show'])->name('devices.show');
     Route::get('/devices/{device}/status', [DeviceController::class, 'status'])->name('devices.status');
+    Route::get('/devices/{device}/smart-fountain/status', SmartFountainStatusController::class)->name('devices.smart-fountain.status');
     Route::get('/devices/{device}/automation', [DeviceController::class, 'automation'])->name('devices.automation');
     Route::get('/devices/{device}/history', [DeviceController::class, 'history'])->name('devices.history');
 
