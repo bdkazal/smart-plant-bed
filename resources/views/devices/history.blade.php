@@ -41,25 +41,45 @@
 
         <div class="grid gap-6 md:grid-cols-2">
             <div class="rounded-lg bg-white p-6 shadow">
-                <h2 class="mb-4 text-xl font-semibold">Watering Logs</h2>
+                @if ($device->isSmartFountain())
+                    <h2 class="mb-4 text-xl font-semibold">Platform Readings</h2>
 
-                @forelse($wateringLogs as $log)
-                <div class="border-b py-3 last:border-b-0">
-                    <p><strong>Trigger:</strong> {{ ucfirst($log->trigger_type) }}</p>
-                    <p><strong>Duration:</strong> {{ $log->duration_seconds }} sec</p>
-                    <p><strong>Status:</strong> {{ ucfirst($log->status) }}</p>
-                    <p><strong>Started At:</strong> {{ $log->started_at?->format('Y-m-d H:i:s') ?? 'N/A' }}</p>
-                    <p><strong>Ended At:</strong> {{ $log->ended_at?->format('Y-m-d H:i:s') ?? 'N/A' }}</p>
-                    <p><strong>Requested At:</strong> {{ $log->created_at?->format('Y-m-d H:i:s') ?? 'N/A' }}</p>
-                    <p><strong>Notes:</strong> {{ $log->notes ?? 'N/A' }}</p>
-                </div>
-                @empty
-                <p class="text-gray-500">No watering logs found.</p>
-                @endforelse
+                    @forelse($platformReadings as $reading)
+                    <div class="border-b py-3 last:border-b-0">
+                        <p><strong>Metric:</strong> {{ $reading->metric }}</p>
+                        <p><strong>Value:</strong> {{ $reading->value }} {{ $reading->unit }}</p>
+                        <p><strong>Recorded At:</strong> {{ $reading->recorded_at?->format('Y-m-d H:i:s') ?? 'N/A' }}</p>
+                        <p><strong>Metadata:</strong></p>
+                        <pre class="overflow-x-auto rounded bg-gray-100 p-3 text-sm">{{ json_encode($reading->metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                    </div>
+                    @empty
+                    <p class="text-gray-500">No platform readings found.</p>
+                    @endforelse
 
-                <div class="mt-4">
-                    {{ $wateringLogs->links() }}
-                </div>
+                    <div class="mt-4">
+                        {{ $platformReadings?->links() }}
+                    </div>
+                @else
+                    <h2 class="mb-4 text-xl font-semibold">Watering Logs</h2>
+
+                    @forelse($wateringLogs as $log)
+                    <div class="border-b py-3 last:border-b-0">
+                        <p><strong>Trigger:</strong> {{ ucfirst($log->trigger_type) }}</p>
+                        <p><strong>Duration:</strong> {{ $log->duration_seconds }} sec</p>
+                        <p><strong>Status:</strong> {{ ucfirst($log->status) }}</p>
+                        <p><strong>Started At:</strong> {{ $log->started_at?->format('Y-m-d H:i:s') ?? 'N/A' }}</p>
+                        <p><strong>Ended At:</strong> {{ $log->ended_at?->format('Y-m-d H:i:s') ?? 'N/A' }}</p>
+                        <p><strong>Requested At:</strong> {{ $log->created_at?->format('Y-m-d H:i:s') ?? 'N/A' }}</p>
+                        <p><strong>Notes:</strong> {{ $log->notes ?? 'N/A' }}</p>
+                    </div>
+                    @empty
+                    <p class="text-gray-500">No watering logs found.</p>
+                    @endforelse
+
+                    <div class="mt-4">
+                        {{ $wateringLogs->links() }}
+                    </div>
+                @endif
             </div>
 
             <div class="rounded-lg bg-white p-6 shadow">
