@@ -191,10 +191,15 @@ class DeviceController extends Controller
             ->latest()
             ->paginate(5, ['*'], 'commands_page');
 
+        $platformReadings = $device->isSmartFountain()
+            ? $device->platformReadings()->latest()->paginate(5, ['*'], 'readings_page')
+            : null;
+
         return view('devices.history', compact(
             'device',
             'wateringLogs',
-            'deviceCommands'
+            'deviceCommands',
+            'platformReadings'
         ));
     }
 
