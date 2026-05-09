@@ -82,7 +82,7 @@
 
                         <form method="POST" action="{{ route('devices.smart-fountain.scenes.apply', [$device, $scene]) }}" class="mb-3">
                             @csrf
-                            <button type="submit" class="w-full rounded bg-green-600 px-4 py-2 text-sm font-semibold text-white hover:bg-green-700">
+                            <button type="submit" class="w-full rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">
                                 Apply Scene
                             </button>
                         </form>
