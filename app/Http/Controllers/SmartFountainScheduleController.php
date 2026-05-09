@@ -65,7 +65,7 @@ class SmartFountainScheduleController extends Controller
         $this->authorizeSmartFountain($device);
 
         $validated = $this->validateSchedule($request, $device);
-        $this->ensureNoConflictingTriggerTimes($device, $validated);
+        $this->ensureNoConflictingRanges($device, $validated);
 
         $device->scheduleRanges()->create($validated);
 
@@ -91,7 +91,7 @@ class SmartFountainScheduleController extends Controller
         $this->authorizeSchedule($device, $schedule);
 
         $validated = $this->validateSchedule($request, $device);
-        $this->ensureNoConflictingTriggerTimes($device, $validated, $schedule);
+        $this->ensureNoConflictingRanges($device, $validated, $schedule);
 
         $schedule->update($validated);
 
@@ -103,6 +103,15 @@ class SmartFountainScheduleController extends Controller
     public function toggle(Device $device, DeviceScheduleRange $schedule): RedirectResponse
     {
         $this->authorizeSchedule($device, $schedule);
+
+        if (! $schedule->is_enabled) {
+            $this->ensureNoConflictingRanges($device, [
+                'days_of_week' => $schedule->days_of_week ?? [],
+                'start_time' => $schedule->start_time,
+                'end_time' => $schedule->end_time,
+                'is_enabled' => true,
+            ], $schedule);
+        }
 
         $schedule->update([
             'is_enabled' => ! $schedule->is_enabled,
@@ -157,12 +166,17 @@ class SmartFountainScheduleController extends Controller
         return $validated;
     }
 
-    private function ensureNoConflictingTriggerTimes(Device $device, array $validated, ?DeviceScheduleRange $ignoreSchedule = null): void
+    private function ensureNoConflictingRanges(Device $device, array $validated, ?DeviceScheduleRange $ignoreSchedule = null): void
     {
-        $newTriggers = [
-            'start_time' => $validated['start_time'],
-            'end_time' => $validated['end_time'],
-        ];
+        if (! ($validated['is_enabled'] ?? false)) {
+            return;
+        }
+
+        $newRanges = $this->expandScheduleRanges(
+            days: $validated['days_of_week'],
+            startTime: $validated['start_time'],
+            endTime: $validated['end_time']
+        );
 
         $existingSchedules = $device->scheduleRanges()
             ->when($ignoreSchedule, fn ($query) => $query->whereKeyNot($ignoreSchedule->id))
@@ -170,29 +184,78 @@ class SmartFountainScheduleController extends Controller
             ->get();
 
         foreach ($existingSchedules as $existingSchedule) {
-            $sharedDays = array_intersect($validated['days_of_week'], $existingSchedule->days_of_week ?? []);
+            $existingRanges = $this->expandScheduleRanges(
+                days: $existingSchedule->days_of_week ?? [],
+                startTime: $existingSchedule->start_time,
+                endTime: $existingSchedule->end_time
+            );
 
-            if (empty($sharedDays)) {
-                continue;
-            }
-
-            $existingTriggers = [
-                'start_time' => $existingSchedule->start_time,
-                'end_time' => $existingSchedule->end_time,
-            ];
-
-            foreach ($newTriggers as $newField => $newTime) {
-                foreach ($existingTriggers as $existingField => $existingTime) {
-                    if ($newTime !== $existingTime) {
+            foreach ($newRanges as $newRange) {
+                foreach ($existingRanges as $existingRange) {
+                    if ($newRange['day'] !== $existingRange['day']) {
                         continue;
                     }
 
-                    throw ValidationException::withMessages([
-                        $newField => "Schedule time conflict with '{$existingSchedule->name}' at " . substr($newTime, 0, 5) . '. Use a different minute or disable the other schedule first.',
-                    ]);
+                    if ($this->rangesOverlap($newRange, $existingRange)) {
+                        throw ValidationException::withMessages([
+                            'start_time' => "Schedule range overlaps with '{$existingSchedule->name}'. Adjust the time range or disable the other schedule first.",
+                        ]);
+                    }
                 }
             }
         }
+    }
+
+    private function expandScheduleRanges(array $days, string $startTime, string $endTime): array
+    {
+        $startMinute = $this->timeToMinute($startTime);
+        $endMinute = $this->timeToMinute($endTime);
+        $ranges = [];
+
+        foreach ($days as $day) {
+            $day = (int) $day;
+
+            if ($startMinute < $endMinute) {
+                $ranges[] = [
+                    'day' => $day,
+                    'start' => $startMinute,
+                    'end' => $endMinute,
+                ];
+
+                continue;
+            }
+
+            $ranges[] = [
+                'day' => $day,
+                'start' => $startMinute,
+                'end' => 1440,
+            ];
+
+            $ranges[] = [
+                'day' => $this->nextDay($day),
+                'start' => 0,
+                'end' => $endMinute,
+            ];
+        }
+
+        return $ranges;
+    }
+
+    private function rangesOverlap(array $first, array $second): bool
+    {
+        return $first['start'] < $second['end'] && $second['start'] < $first['end'];
+    }
+
+    private function timeToMinute(string $time): int
+    {
+        [$hour, $minute] = array_map('intval', explode(':', substr($time, 0, 5)));
+
+        return ($hour * 60) + $minute;
+    }
+
+    private function nextDay(int $day): int
+    {
+        return $day === 7 ? 1 : $day + 1;
     }
 
     private function authorizeSchedule(Device $device, DeviceScheduleRange $schedule): void
