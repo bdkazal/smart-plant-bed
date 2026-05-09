@@ -32,7 +32,7 @@
 
         <div class="mb-6">
             <h1 class="text-2xl font-bold">{{ $scene ? 'Edit Scene' : 'Create Scene' }}</h1>
-            <p class="text-gray-600">Save a reusable Smart Fountain preset.</p>
+            <p class="text-gray-600">Choose which Smart Fountain outputs this scene should control.</p>
         </div>
 
         <form method="POST" action="{{ $scene ? route('devices.smart-fountain.scenes.update', [$device, $scene]) : route('devices.smart-fountain.scenes.store', $device) }}" class="space-y-4">
@@ -55,7 +55,10 @@
 
             <div class="grid gap-4 md:grid-cols-3">
                 <div class="rounded-lg bg-white p-5 shadow">
-                    <h2 class="mb-3 text-lg font-semibold">Pump</h2>
+                    <label class="mb-4 flex items-center gap-2 font-semibold">
+                        <input type="checkbox" name="pump_include" value="1" @checked(old('pump_include', $scene ? array_key_exists('pump', $scene->outputs ?? []) : true))>
+                        <span>Include Pump</span>
+                    </label>
 
                     <label class="mb-3 flex items-center gap-2">
                         <input type="checkbox" name="pump_enabled" value="1" @checked(old('pump_enabled', data_get($outputs, 'pump.enabled')))> 
@@ -70,12 +73,14 @@
                         min="0"
                         max="100"
                         value="{{ old('pump_speed_percent', data_get($outputs, 'pump.speed_percent', 0)) }}"
-                        class="w-full rounded border px-3 py-2"
-                        required>
+                        class="w-full rounded border px-3 py-2">
                 </div>
 
                 <div class="rounded-lg bg-white p-5 shadow">
-                    <h2 class="mb-3 text-lg font-semibold">COB Light</h2>
+                    <label class="mb-4 flex items-center gap-2 font-semibold">
+                        <input type="checkbox" name="cob_light_include" value="1" @checked(old('cob_light_include', $scene ? array_key_exists('cob_light', $scene->outputs ?? []) : true))>
+                        <span>Include COB Light</span>
+                    </label>
 
                     <label class="mb-3 flex items-center gap-2">
                         <input type="checkbox" name="cob_light_enabled" value="1" @checked(old('cob_light_enabled', data_get($outputs, 'cob_light.enabled')))> 
@@ -90,12 +95,14 @@
                         min="0"
                         max="100"
                         value="{{ old('cob_brightness_percent', data_get($outputs, 'cob_light.brightness_percent', 0)) }}"
-                        class="w-full rounded border px-3 py-2"
-                        required>
+                        class="w-full rounded border px-3 py-2">
                 </div>
 
                 <div class="rounded-lg bg-white p-5 shadow">
-                    <h2 class="mb-3 text-lg font-semibold">RGB Light</h2>
+                    <label class="mb-4 flex items-center gap-2 font-semibold">
+                        <input type="checkbox" name="rgb_light_include" value="1" @checked(old('rgb_light_include', $scene ? array_key_exists('rgb_light', $scene->outputs ?? []) : true))>
+                        <span>Include RGB Light</span>
+                    </label>
 
                     <label class="mb-3 flex items-center gap-2">
                         <input type="checkbox" name="rgb_light_enabled" value="1" @checked(old('rgb_light_enabled', data_get($outputs, 'rgb_light.enabled')))> 
@@ -110,8 +117,7 @@
                         min="0"
                         max="100"
                         value="{{ old('rgb_brightness_percent', data_get($outputs, 'rgb_light.brightness_percent', 0)) }}"
-                        class="mb-3 w-full rounded border px-3 py-2"
-                        required>
+                        class="mb-3 w-full rounded border px-3 py-2">
 
                     <label for="rgb_color" class="mb-1 block text-sm font-medium">Color</label>
                     <input
@@ -119,11 +125,10 @@
                         type="color"
                         name="rgb_color"
                         value="{{ old('rgb_color', data_get($outputs, 'rgb_light.color', '#FFB066')) }}"
-                        class="mb-3 h-10 w-full rounded border px-2 py-1"
-                        required>
+                        class="mb-3 h-10 w-full rounded border px-2 py-1">
 
                     <label for="rgb_effect" class="mb-1 block text-sm font-medium">Effect</label>
-                    <select id="rgb_effect" name="rgb_effect" class="w-full rounded border px-3 py-2" required>
+                    <select id="rgb_effect" name="rgb_effect" class="w-full rounded border px-3 py-2">
                         @foreach (['solid', 'breathing', 'slow_rainbow', 'warm_glow', 'water_shimmer', 'night_mode'] as $effect)
                             <option value="{{ $effect }}" @selected(old('rgb_effect', data_get($outputs, 'rgb_light.effect', 'warm_glow')) === $effect)>
                                 {{ ucwords(str_replace('_', ' ', $effect)) }}
