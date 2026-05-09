@@ -16,8 +16,9 @@
 
         <div class="mb-4 flex flex-wrap gap-2">
             <a href="{{ route('devices.show', $device) }}" class="rounded bg-blue-600 px-3 py-2 text-sm text-white">Home</a>
-            <a href="{{ route('devices.smart-fountain.scenes.index', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">Scenes</a>
-            <a href="{{ route('devices.history', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">History</a>
+            <a href="{{ route('devices.smart-fountain.scenes.index', $device) }}" class="rounded bg-white px-3 py-2 text-sm border hover:bg-gray-50">Scenes</a>
+            <a href="{{ route('devices.smart-fountain.schedules.index', $device) }}" class="rounded bg-white px-3 py-2 text-sm border hover:bg-gray-50">Schedule</a>
+            <a href="{{ route('devices.history', $device) }}" class="rounded bg-white px-3 py-2 text-sm border hover:bg-gray-50">History</a>
         </div>
 
         <div class="mb-6 flex items-center justify-between gap-4">
@@ -57,8 +58,15 @@
 
             $latestCommandFor = function (string $outputKey) use ($device) {
                 return $device->deviceCommands->first(function ($command) use ($outputKey) {
-                    return $command->command_type === 'output_set'
-                        && data_get($command->payload, 'output') === $outputKey;
+                    if ($command->command_type === 'output_set') {
+                        return data_get($command->payload, 'output') === $outputKey;
+                    }
+
+                    if ($command->command_type === 'scene_apply') {
+                        return is_array(data_get($command->payload, 'outputs.' . $outputKey));
+                    }
+
+                    return false;
                 });
             };
 
