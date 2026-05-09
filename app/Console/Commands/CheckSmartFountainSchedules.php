@@ -11,7 +11,7 @@ class CheckSmartFountainSchedules extends Command
 {
     protected $signature = 'smart-fountain:check-schedules {--day=} {--time=}';
 
-    protected $description = 'Check Smart Fountain schedule ranges and create scene commands when due';
+    protected $description = 'Check Smart Fountain daily timeline blocks and create scene commands when due';
 
     public function handle(): int
     {
@@ -30,8 +30,9 @@ class CheckSmartFountainSchedules extends Command
             return self::FAILURE;
         }
 
-        $schedules = DeviceScheduleRange::with(['device.outputs', 'startScene', 'endScene'])
+        $schedules = DeviceScheduleRange::with(['device.outputs', 'startScene'])
             ->where('is_enabled', true)
+            ->whereIn('period_key', ['day', 'evening', 'night'])
             ->get();
 
         $createdCount = 0;
@@ -54,37 +55,32 @@ class CheckSmartFountainSchedules extends Command
                 continue;
             }
 
-            if ($currentTime === $schedule->start_time && $schedule->last_started_on?->toDateString() !== $currentDate) {
-                if ($this->queueSceneCommand($schedule, 'start')) {
-                    $schedule->update([
-                        'last_started_on' => $currentDate,
-                        'last_started_at' => now(),
-                    ]);
-
-                    $createdCount++;
-                }
+            if ($currentTime !== $schedule->start_time) {
+                continue;
             }
 
-            if ($currentTime === $schedule->end_time && $schedule->last_ended_on?->toDateString() !== $currentDate) {
-                if ($this->queueSceneCommand($schedule, 'end')) {
-                    $schedule->update([
-                        'last_ended_on' => $currentDate,
-                        'last_ended_at' => now(),
-                    ]);
+            if ($schedule->last_started_on?->toDateString() === $currentDate) {
+                continue;
+            }
 
-                    $createdCount++;
-                }
+            if ($this->queueSceneCommand($schedule)) {
+                $schedule->update([
+                    'last_started_on' => $currentDate,
+                    'last_started_at' => now(),
+                ]);
+
+                $createdCount++;
             }
         }
 
-        $this->info("Created {$createdCount} Smart Fountain schedule command(s).");
+        $this->info("Created {$createdCount} Smart Fountain timeline command(s).");
 
         return self::SUCCESS;
     }
 
-    private function queueSceneCommand(DeviceScheduleRange $schedule, string $phase): bool
+    private function queueSceneCommand(DeviceScheduleRange $schedule): bool
     {
-        $scene = $phase === 'start' ? $schedule->startScene : $schedule->endScene;
+        $scene = $schedule->startScene;
         $device = $schedule->device;
 
         if (! $scene || ! $device) {
@@ -95,7 +91,7 @@ class CheckSmartFountainSchedules extends Command
             ->where('command_type', 'scene_apply')
             ->whereIn('status', ['pending', 'acknowledged'])
             ->where('payload->schedule_range_id', $schedule->id)
-            ->where('payload->schedule_phase', $phase)
+            ->where('payload->schedule_phase', 'start')
             ->exists();
 
         if ($existingCommand) {
@@ -117,10 +113,11 @@ class CheckSmartFountainSchedules extends Command
             'payload' => [
                 'scene_id' => $scene->id,
                 'scene_name' => $scene->name,
-                'source' => 'schedule:' . $schedule->id . ':' . $phase,
+                'source' => 'schedule:' . $schedule->id . ':' . $schedule->period_key,
                 'schedule_range_id' => $schedule->id,
                 'schedule_name' => $schedule->name,
-                'schedule_phase' => $phase,
+                'schedule_period' => $schedule->period_key,
+                'schedule_phase' => 'start',
                 'outputs' => $outputs,
             ],
             'status' => 'pending',
