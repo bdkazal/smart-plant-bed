@@ -33,7 +33,7 @@
 
         <div class="mb-6">
             <h1 class="text-2xl font-bold">Edit {{ $schedule->name }} Block</h1>
-            <p class="text-gray-600">Choose the days, time range, and scene for this timeline block. Blocks cannot overlap.</p>
+            <p class="text-gray-600">Choose the days, start time, and scene for this timeline block. The end time is calculated from the next block start time.</p>
         </div>
 
         <form method="POST" action="{{ route('devices.smart-fountain.schedules.update', [$device, $schedule]) }}" class="space-y-4">
@@ -54,13 +54,15 @@
 
             <div class="grid gap-4 md:grid-cols-2">
                 <div class="rounded-lg bg-white p-5 shadow">
-                    <h2 class="mb-3 text-lg font-semibold">Time Range</h2>
+                    <h2 class="mb-3 text-lg font-semibold">Time</h2>
 
                     <label for="start_time" class="mb-1 block text-sm font-medium">Start Time</label>
                     <input id="start_time" type="time" name="start_time" value="{{ old('start_time', substr($schedule->start_time, 0, 5)) }}" class="mb-3 w-full rounded border px-3 py-2" required>
 
-                    <label for="end_time" class="mb-1 block text-sm font-medium">End Time</label>
-                    <input id="end_time" type="time" name="end_time" value="{{ old('end_time', substr($schedule->end_time, 0, 5)) }}" class="w-full rounded border px-3 py-2" required>
+                    <p class="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                        <strong>Current End Time:</strong> {{ substr($schedule->end_time, 0, 5) }}<br>
+                        This will automatically become the next block's start time after saving.
+                    </p>
                 </div>
 
                 <div class="rounded-lg bg-white p-5 shadow">
@@ -83,7 +85,7 @@
             </div>
 
             <div class="rounded border border-yellow-300 bg-yellow-50 px-4 py-3 text-yellow-800">
-                A block may end at the same time the next block starts, but enabled blocks cannot overlap.
+                Timeline order must stay Day start &lt; Evening start &lt; Night start. End times are connected automatically: Day ends when Evening starts, Evening ends when Night starts, and Night ends when Day starts.
             </div>
 
             <div class="flex gap-2">
