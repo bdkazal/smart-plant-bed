@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Device;
+use App\Models\DeviceCommand;
 use App\Services\DeviceCommandLifecycleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
@@ -26,7 +27,7 @@ class SmartFountainStatusController extends Controller
         $device->load([
             'outputs',
             'platformReadings' => fn ($query) => $query->latest()->limit(10),
-            'deviceCommands' => fn ($query) => $query->latest()->limit(20),
+            'deviceCommands' => fn ($query) => $query->latest()->limit(30),
         ]);
 
         $latestReadings = $device->platformReadings
@@ -34,10 +35,7 @@ class SmartFountainStatusController extends Controller
             ->map(fn ($readings) => $readings->first());
 
         $outputs = $device->outputs->mapWithKeys(function ($output) use ($device) {
-            $latestCommand = $device->deviceCommands->first(function ($command) use ($output) {
-                return $command->command_type === 'output_set'
-                    && data_get($command->payload, 'output') === $output->key;
-            });
+            $latestCommand = $this->latestCommandForOutput($device, $output->key);
 
             return [
                 $output->key => [
@@ -78,6 +76,21 @@ class SmartFountainStatusController extends Controller
             ],
             'outputs' => $outputs,
         ]);
+    }
+
+    private function latestCommandForOutput(Device $device, string $outputKey): ?DeviceCommand
+    {
+        return $device->deviceCommands->first(function ($command) use ($outputKey) {
+            if ($command->command_type === 'output_set') {
+                return data_get($command->payload, 'output') === $outputKey;
+            }
+
+            if ($command->command_type === 'scene_apply') {
+                return is_array(data_get($command->payload, 'outputs.' . $outputKey));
+            }
+
+            return false;
+        });
     }
 
     private function isDeviceOnline(Device $device): bool
