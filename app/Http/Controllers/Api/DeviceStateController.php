@@ -106,7 +106,7 @@ class DeviceStateController extends Controller
         }
 
         $updatedOutputs = $this->syncPlatformOutputs($device, $validated['outputs'] ?? []);
-        $storedPlatformReadings = $this->storePlatformReadings($device, $validated['readings'] ?? []);
+        $storedDeviceReadings = $this->storePlatformReadings($device, $validated['readings'] ?? []);
         $acceptedCompletedCommandId = $this->markCompletedCommand($device, $validated['last_completed_command_id'] ?? null);
 
         return response()->json([
@@ -119,11 +119,16 @@ class DeviceStateController extends Controller
                 'outputs' => $device->outputs()->get(['key', 'type', 'name', 'state', 'last_changed_source', 'last_changed_at']),
                 'last_reported_at' => $device->fresh()->last_reported_at?->format('Y-m-d H:i:s'),
             ],
+            'legacy_sensor_reading_stored' => (bool) $storedReading,
+            'legacy_sensor_reading_id' => $storedReading?->id,
+            'platform_outputs_updated' => $updatedOutputs,
+            'device_readings_stored' => $storedDeviceReadings,
+            'accepted_completed_command_id' => $acceptedCompletedCommandId,
+
+            // Deprecated MVP transition keys. Prefer the clearer keys above.
             'reading_stored' => (bool) $storedReading,
             'reading_id' => $storedReading?->id,
-            'platform_outputs_updated' => $updatedOutputs,
-            'platform_readings_stored' => $storedPlatformReadings,
-            'accepted_completed_command_id' => $acceptedCompletedCommandId,
+            'platform_readings_stored' => $storedDeviceReadings,
         ]);
     }
 
