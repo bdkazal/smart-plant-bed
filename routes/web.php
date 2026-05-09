@@ -3,6 +3,7 @@
 use App\Http\Controllers\DeviceClaimController;
 use App\Http\Controllers\DeviceController;
 use App\Http\Controllers\SmartFountainSceneController;
+use App\Http\Controllers\SmartFountainScheduleController;
 use App\Http\Controllers\SmartFountainStatusController;
 use App\Http\Controllers\WateringScheduleController;
 use Illuminate\Support\Facades\Auth;
@@ -45,6 +46,21 @@ Route::middleware(['auth'])->group(function () {
         ->name('devices.smart-fountain.scenes.destroy');
     Route::post('/devices/{device}/smart-fountain/scenes/{scene}/apply', [SmartFountainSceneController::class, 'apply'])
         ->name('devices.smart-fountain.scenes.apply');
+
+    Route::get('/devices/{device}/smart-fountain/schedules', [SmartFountainScheduleController::class, 'index'])
+        ->name('devices.smart-fountain.schedules.index');
+    Route::get('/devices/{device}/smart-fountain/schedules/create', [SmartFountainScheduleController::class, 'create'])
+        ->name('devices.smart-fountain.schedules.create');
+    Route::post('/devices/{device}/smart-fountain/schedules', [SmartFountainScheduleController::class, 'store'])
+        ->name('devices.smart-fountain.schedules.store');
+    Route::get('/devices/{device}/smart-fountain/schedules/{schedule}/edit', [SmartFountainScheduleController::class, 'edit'])
+        ->name('devices.smart-fountain.schedules.edit');
+    Route::put('/devices/{device}/smart-fountain/schedules/{schedule}', [SmartFountainScheduleController::class, 'update'])
+        ->name('devices.smart-fountain.schedules.update');
+    Route::patch('/devices/{device}/smart-fountain/schedules/{schedule}/toggle', [SmartFountainScheduleController::class, 'toggle'])
+        ->name('devices.smart-fountain.schedules.toggle');
+    Route::delete('/devices/{device}/smart-fountain/schedules/{schedule}', [SmartFountainScheduleController::class, 'destroy'])
+        ->name('devices.smart-fountain.schedules.destroy');
 
     Route::post('/devices/{device}/settings', [DeviceController::class, 'updateSettings'])->name('devices.settings.update');
     Route::post('/devices/{device}/water-now', [DeviceController::class, 'waterNow'])->name('devices.water-now');
