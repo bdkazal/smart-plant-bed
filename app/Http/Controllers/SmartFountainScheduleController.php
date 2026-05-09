@@ -24,20 +24,33 @@ class SmartFountainScheduleController extends Controller
         7 => 'Sunday',
     ];
 
+    private const PERIODS = [
+        'day' => [
+            'name' => 'Day',
+            'start_time' => '06:00:00',
+            'end_time' => '18:00:00',
+            'scene_name' => 'Day Fountain',
+        ],
+        'evening' => [
+            'name' => 'Evening',
+            'start_time' => '18:00:00',
+            'end_time' => '23:00:00',
+            'scene_name' => 'Night Glow',
+        ],
+        'night' => [
+            'name' => 'Night',
+            'start_time' => '23:00:00',
+            'end_time' => '06:00:00',
+            'scene_name' => 'All Off',
+        ],
+    ];
+
     public function index(Device $device): View
     {
         $this->authorizeSmartFountain($device);
+        $this->ensureTimelineBlocks($device);
 
-        app(SmartFountainScenePresetService::class)->ensureDefaultScenes($device);
-
-        $device->load([
-            'scheduleRanges.startScene',
-            'scheduleRanges.endScene',
-        ]);
-
-        $schedules = $device->scheduleRanges
-            ->sortBy('start_time')
-            ->values();
+        $schedules = $this->timelineSchedules($device);
 
         return view('devices.smart-fountain.schedules.index', [
             'device' => $device,
@@ -46,41 +59,37 @@ class SmartFountainScheduleController extends Controller
         ]);
     }
 
-    public function create(Device $device): View
+    public function create(Device $device): RedirectResponse
     {
         $this->authorizeSmartFountain($device);
 
-        app(SmartFountainScenePresetService::class)->ensureDefaultScenes($device);
-
-        return view('devices.smart-fountain.schedules.form', [
-            'device' => $device,
-            'schedule' => null,
-            'scenes' => $device->scenes()->orderBy('name')->get(),
-            'dayNames' => self::DAY_NAMES,
-        ]);
+        return redirect()
+            ->route('devices.smart-fountain.schedules.index', $device)
+            ->with('success', 'Smart Fountain uses three fixed timeline blocks: Day, Evening, and Night. Edit one of them to change its time or scene.');
     }
 
     public function store(Request $request, Device $device): RedirectResponse
     {
         $this->authorizeSmartFountain($device);
 
-        $validated = $this->validateSchedule($request, $device);
-        $this->ensureNoConflictingRanges($device, $validated);
-
-        $device->scheduleRanges()->create($validated);
-
         return redirect()
             ->route('devices.smart-fountain.schedules.index', $device)
-            ->with('success', 'Schedule range created successfully.');
+            ->withErrors(['schedule' => 'Creating extra Smart Fountain schedules is disabled for V1. Edit the Day, Evening, or Night block instead.']);
     }
 
     public function edit(Device $device, DeviceScheduleRange $schedule): View
     {
         $this->authorizeSchedule($device, $schedule);
 
+        if (! array_key_exists((string) $schedule->period_key, self::PERIODS)) {
+            abort(404);
+        }
+
+        $this->ensureTimelineBlocks($device);
+
         return view('devices.smart-fountain.schedules.form', [
             'device' => $device,
-            'schedule' => $schedule,
+            'schedule' => $schedule->fresh(),
             'scenes' => $device->scenes()->orderBy('name')->get(),
             'dayNames' => self::DAY_NAMES,
         ]);
@@ -90,25 +99,37 @@ class SmartFountainScheduleController extends Controller
     {
         $this->authorizeSchedule($device, $schedule);
 
-        $validated = $this->validateSchedule($request, $device);
+        if (! array_key_exists((string) $schedule->period_key, self::PERIODS)) {
+            abort(404);
+        }
+
+        $validated = $this->validateSchedule($request, $device, $schedule);
         $this->ensureNoConflictingRanges($device, $validated, $schedule);
 
         $schedule->update($validated);
 
         return redirect()
             ->route('devices.smart-fountain.schedules.index', $device)
-            ->with('success', 'Schedule range updated successfully.');
+            ->with('success', 'Timeline block updated successfully.');
     }
 
     public function toggle(Device $device, DeviceScheduleRange $schedule): RedirectResponse
     {
         $this->authorizeSchedule($device, $schedule);
 
+        if (! array_key_exists((string) $schedule->period_key, self::PERIODS)) {
+            abort(404);
+        }
+
         if (! $schedule->is_enabled) {
             $this->ensureNoConflictingRanges($device, [
+                'period_key' => $schedule->period_key,
+                'name' => $schedule->name,
                 'days_of_week' => $schedule->days_of_week ?? [],
                 'start_time' => $schedule->start_time,
                 'end_time' => $schedule->end_time,
+                'start_scene_id' => $schedule->start_scene_id,
+                'end_scene_id' => $schedule->end_scene_id,
                 'is_enabled' => true,
             ], $schedule);
         }
@@ -119,24 +140,21 @@ class SmartFountainScheduleController extends Controller
 
         return redirect()
             ->route('devices.smart-fountain.schedules.index', $device)
-            ->with('success', 'Schedule range status updated successfully.');
+            ->with('success', 'Timeline block status updated successfully.');
     }
 
     public function destroy(Device $device, DeviceScheduleRange $schedule): RedirectResponse
     {
         $this->authorizeSchedule($device, $schedule);
 
-        $schedule->delete();
-
         return redirect()
             ->route('devices.smart-fountain.schedules.index', $device)
-            ->with('success', 'Schedule range deleted successfully.');
+            ->withErrors(['schedule' => 'Timeline blocks cannot be deleted. Disable the block instead.']);
     }
 
-    private function validateSchedule(Request $request, Device $device): array
+    private function validateSchedule(Request $request, Device $device, DeviceScheduleRange $schedule): array
     {
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
             'days_of_week' => ['required', 'array', 'min:1'],
             'days_of_week.*' => ['integer', 'between:1,7'],
             'start_time' => ['required', 'date_format:H:i'],
@@ -145,13 +163,11 @@ class SmartFountainScheduleController extends Controller
                 'required',
                 Rule::exists('device_scenes', 'id')->where('device_id', $device->id),
             ],
-            'end_scene_id' => [
-                'required',
-                Rule::exists('device_scenes', 'id')->where('device_id', $device->id),
-            ],
             'is_enabled' => ['nullable', 'boolean'],
         ]);
 
+        $validated['name'] = self::PERIODS[$schedule->period_key]['name'];
+        $validated['period_key'] = $schedule->period_key;
         $validated['days_of_week'] = collect($validated['days_of_week'])
             ->map(fn ($day) => (int) $day)
             ->unique()
@@ -161,9 +177,57 @@ class SmartFountainScheduleController extends Controller
 
         $validated['start_time'] = $validated['start_time'] . ':00';
         $validated['end_time'] = $validated['end_time'] . ':00';
+        $validated['end_scene_id'] = $validated['start_scene_id'];
         $validated['is_enabled'] = $request->boolean('is_enabled');
 
         return $validated;
+    }
+
+    private function ensureTimelineBlocks(Device $device): void
+    {
+        app(SmartFountainScenePresetService::class)->ensureDefaultScenes($device);
+        $device->loadMissing('scenes');
+
+        foreach (self::PERIODS as $periodKey => $period) {
+            $scene = $this->sceneByName($device, $period['scene_name'])
+                ?? $device->scenes()->orderBy('id')->first();
+
+            if (! $scene) {
+                continue;
+            }
+
+            $device->scheduleRanges()->firstOrCreate(
+                ['period_key' => $periodKey],
+                [
+                    'name' => $period['name'],
+                    'days_of_week' => [1, 2, 3, 4, 5, 6, 7],
+                    'start_time' => $period['start_time'],
+                    'end_time' => $period['end_time'],
+                    'start_scene_id' => $scene->id,
+                    'end_scene_id' => $scene->id,
+                    'is_enabled' => true,
+                ]
+            );
+        }
+    }
+
+    private function sceneByName(Device $device, string $name)
+    {
+        return $device->scenes->firstWhere('name', $name)
+            ?? $device->scenes()->where('name', $name)->first();
+    }
+
+    private function timelineSchedules(Device $device)
+    {
+        $device->load([
+            'scheduleRanges.startScene',
+            'scheduleRanges.endScene',
+        ]);
+
+        return collect(array_keys(self::PERIODS))
+            ->map(fn ($periodKey) => $device->scheduleRanges->firstWhere('period_key', $periodKey))
+            ->filter()
+            ->values();
     }
 
     private function ensureNoConflictingRanges(Device $device, array $validated, ?DeviceScheduleRange $ignoreSchedule = null): void
@@ -180,6 +244,7 @@ class SmartFountainScheduleController extends Controller
 
         $existingSchedules = $device->scheduleRanges()
             ->when($ignoreSchedule, fn ($query) => $query->whereKeyNot($ignoreSchedule->id))
+            ->whereIn('period_key', array_keys(self::PERIODS))
             ->where('is_enabled', true)
             ->get();
 
@@ -198,7 +263,7 @@ class SmartFountainScheduleController extends Controller
 
                     if ($this->rangesOverlap($newRange, $existingRange)) {
                         throw ValidationException::withMessages([
-                            'start_time' => "Schedule range overlaps with '{$existingSchedule->name}'. Adjust the time range or disable the other schedule first.",
+                            'start_time' => "Timeline block overlaps with '{$existingSchedule->name}'. Adjust the time range or disable the other block first.",
                         ]);
                     }
                 }
