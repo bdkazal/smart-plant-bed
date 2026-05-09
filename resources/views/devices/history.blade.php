@@ -16,8 +16,9 @@
 
         <div class="mb-4 flex flex-wrap gap-2">
             @if ($device->isSmartFountain())
-                <a href="{{ route('devices.show', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">Home</a>
-                <a href="{{ route('devices.smart-fountain.scenes.index', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">Scenes</a>
+                <a href="{{ route('devices.show', $device) }}" class="rounded bg-white px-3 py-2 text-sm border hover:bg-gray-50">Home</a>
+                <a href="{{ route('devices.smart-fountain.scenes.index', $device) }}" class="rounded bg-white px-3 py-2 text-sm border hover:bg-gray-50">Scenes</a>
+                <a href="{{ route('devices.smart-fountain.schedules.index', $device) }}" class="rounded bg-white px-3 py-2 text-sm border hover:bg-gray-50">Schedule</a>
                 <a href="{{ route('devices.history', $device) }}" class="rounded bg-blue-600 px-3 py-2 text-sm text-white">History</a>
             @else
                 <a href="{{ route('devices.show', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">Home</a>
