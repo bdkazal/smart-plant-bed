@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Device;
 use App\Models\DeviceCommand;
 use App\Models\DeviceScene;
+use App\Services\SmartFountainScenePresetService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,6 +16,8 @@ class SmartFountainSceneController extends Controller
     public function index(Device $device): View
     {
         $this->authorizeSmartFountain($device);
+
+        app(SmartFountainScenePresetService::class)->ensureDefaultScenes($device);
 
         $device->load([
             'scenes' => fn ($query) => $query->latest(),
