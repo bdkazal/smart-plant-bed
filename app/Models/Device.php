@@ -140,4 +140,9 @@ class Device extends Model
     {
         return $this->hasMany(DeviceReading::class);
     }
+
+    public function scenes(): HasMany
+    {
+        return $this->hasMany(DeviceScene::class);
+    }
 }
