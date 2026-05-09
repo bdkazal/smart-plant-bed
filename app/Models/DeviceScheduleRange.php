@@ -10,6 +10,7 @@ class DeviceScheduleRange extends Model
     protected $fillable = [
         'device_id',
         'name',
+        'period_key',
         'days_of_week',
         'start_time',
         'end_time',
