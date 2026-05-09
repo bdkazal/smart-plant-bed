@@ -8,3 +8,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('watering:check-schedules')->everyMinute();
+Schedule::command('smart-fountain:check-schedules')->everyMinute();
