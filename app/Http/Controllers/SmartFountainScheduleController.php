@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class SmartFountainScheduleController extends Controller
@@ -64,6 +65,7 @@ class SmartFountainScheduleController extends Controller
         $this->authorizeSmartFountain($device);
 
         $validated = $this->validateSchedule($request, $device);
+        $this->ensureNoConflictingTriggerTimes($device, $validated);
 
         $device->scheduleRanges()->create($validated);
 
@@ -88,7 +90,10 @@ class SmartFountainScheduleController extends Controller
     {
         $this->authorizeSchedule($device, $schedule);
 
-        $schedule->update($this->validateSchedule($request, $device));
+        $validated = $this->validateSchedule($request, $device);
+        $this->ensureNoConflictingTriggerTimes($device, $validated, $schedule);
+
+        $schedule->update($validated);
 
         return redirect()
             ->route('devices.smart-fountain.schedules.index', $device)
@@ -150,6 +155,44 @@ class SmartFountainScheduleController extends Controller
         $validated['is_enabled'] = $request->boolean('is_enabled');
 
         return $validated;
+    }
+
+    private function ensureNoConflictingTriggerTimes(Device $device, array $validated, ?DeviceScheduleRange $ignoreSchedule = null): void
+    {
+        $newTriggers = [
+            'start_time' => $validated['start_time'],
+            'end_time' => $validated['end_time'],
+        ];
+
+        $existingSchedules = $device->scheduleRanges()
+            ->when($ignoreSchedule, fn ($query) => $query->whereKeyNot($ignoreSchedule->id))
+            ->where('is_enabled', true)
+            ->get();
+
+        foreach ($existingSchedules as $existingSchedule) {
+            $sharedDays = array_intersect($validated['days_of_week'], $existingSchedule->days_of_week ?? []);
+
+            if (empty($sharedDays)) {
+                continue;
+            }
+
+            $existingTriggers = [
+                'start_time' => $existingSchedule->start_time,
+                'end_time' => $existingSchedule->end_time,
+            ];
+
+            foreach ($newTriggers as $newField => $newTime) {
+                foreach ($existingTriggers as $existingField => $existingTime) {
+                    if ($newTime !== $existingTime) {
+                        continue;
+                    }
+
+                    throw ValidationException::withMessages([
+                        $newField => "Schedule time conflict with '{$existingSchedule->name}' at " . substr($newTime, 0, 5) . '. Use a different minute or disable the other schedule first.',
+                    ]);
+                }
+            }
+        }
     }
 
     private function authorizeSchedule(Device $device, DeviceScheduleRange $schedule): void
