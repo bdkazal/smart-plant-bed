@@ -145,4 +145,9 @@ class Device extends Model
     {
         return $this->hasMany(DeviceScene::class);
     }
+
+    public function scheduleRanges(): HasMany
+    {
+        return $this->hasMany(DeviceScheduleRange::class);
+    }
 }
