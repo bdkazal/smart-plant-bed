@@ -12,7 +12,7 @@ The goal is one Laravel app where a user can own and manage many Biztola IoT pro
 - Smart Bathroom Controller
 - future Biztola devices
 
-The original Smart Plant Bed watering system remains the first working product, but new development should follow the platform model: devices have types, capabilities, outputs, readings, commands, and product-specific behavior.
+The original Smart Plant Bed watering system remains the first working product, but new development should follow the platform model: devices have types, capabilities, outputs, readings, commands, scenes, schedules, and product-specific behavior.
 
 ---
 
@@ -203,6 +203,50 @@ For a Smart Fountain, when this command becomes `executed`, it means the device 
 
 ---
 
+## Plant Bed Isolation Rule
+
+Smart Fountain additions must not change the existing Plant Bed product behavior.
+
+Plant Bed still uses:
+
+```text
+valve_on / valve_off commands
+watering_logs
+sensor_readings
+Plant Bed automation page
+Plant Bed watering schedules
+Plant Bed dashboard/status flow
+```
+
+Smart Fountain uses separate product-specific behavior:
+
+```text
+output_set / scene_apply commands
+device_outputs
+device_readings
+device_scenes
+Smart Fountain Home / Scenes / History tabs
+Smart Fountain status endpoint
+```
+
+Important implementation rule:
+
+```text
+Do not make Plant Bed pages show Smart Fountain scenes.
+Do not make Smart Fountain pages show Plant Bed automation or watering schedules.
+Do not make platform commands update watering_logs.
+Do not replay failed/expired commands when a device reconnects.
+```
+
+The shared history page is product-aware:
+
+```text
+Plant Bed: Watering Logs + Device Commands
+Smart Fountain: Device Readings + Device Commands
+```
+
+---
+
 ## Command Lifecycle
 
 The backend supports this command lifecycle:
@@ -257,6 +301,7 @@ Used from:
 DeviceController
 DeviceCommandController
 DeviceReadingController
+SmartFountainStatusController
 ```
 
 Current timeout behavior:
@@ -311,9 +356,83 @@ Dashboard sends command
 → Dashboard auto-refresh shows the new state
 ```
 
+### Scene command = full device preset
+
+Smart Fountain scenes are **full-device presets**. A scene controls all three default outputs:
+
+```text
+pump
+cob_light
+rgb_light
+```
+
+If an output should be off in a scene, store it as disabled/0%, not omitted.
+
+Example All Off scene:
+
+```json
+{
+  "pump": {
+    "enabled": false,
+    "speed_percent": 0
+  },
+  "cob_light": {
+    "enabled": false,
+    "brightness_percent": 0
+  },
+  "rgb_light": {
+    "enabled": false,
+    "brightness_percent": 0,
+    "color": "#000000",
+    "effect": "solid"
+  }
+}
+```
+
+Applying a scene creates one command:
+
+```text
+command_type = scene_apply
+```
+
+Payload shape:
+
+```json
+{
+  "scene_id": 1,
+  "scene_name": "Day Fountain",
+  "source": "scene:1",
+  "outputs": {
+    "pump": {
+      "enabled": true,
+      "speed_percent": 60
+    },
+    "cob_light": {
+      "enabled": true,
+      "brightness_percent": 40
+    },
+    "rgb_light": {
+      "enabled": true,
+      "brightness_percent": 35,
+      "color": "#FFB066",
+      "effect": "warm_glow"
+    }
+  }
+}
+```
+
+When a `scene_apply` command is acknowledged/executed:
+
+```text
+acknowledged = device accepted the scene command
+executed = all requested scene output states were applied
+```
+
+The dashboard output cards should show the `scene_apply` status for all outputs included in the scene.
+
 ### V1 executed ACK behavior
 
-For Smart Fountain `output_set`, an executed ACK means the device says the requested state was applied.
+For Smart Fountain `output_set` and `scene_apply`, an executed ACK means the device says the requested state was applied.
 
 For V1/Postman testing, Laravel applies the output state when the device sends:
 
@@ -372,14 +491,17 @@ The dashboard should auto-refresh like Plant Bed using:
 GET /devices/{device}/smart-fountain/status
 ```
 
+That status endpoint also runs stale command cleanup so old pending/acknowledged Smart Fountain commands do not stay stuck forever on the dashboard.
+
 Smart Fountain currently has ready tabs:
 
 ```text
 Home
+Scenes
 History
 ```
 
-Automation and Schedules are intentionally hidden until Smart Fountain-specific behavior is designed.
+Automation and Schedules are intentionally hidden until Smart Fountain-specific schedule-range behavior is designed.
 
 ---
 
@@ -450,6 +572,24 @@ exhaust_fan
 ```
 
 Each output can store JSON config and JSON state.
+
+### Scenes
+
+Stored in:
+
+```text
+device_scenes
+```
+
+For Smart Fountain V1, scenes are full-device presets for:
+
+```text
+pump
+cob_light
+rgb_light
+```
+
+Scenes are applied through one `scene_apply` command, not multiple `output_set` commands. This makes the scene act like one user action.
 
 ### Device Readings
 
@@ -596,6 +736,15 @@ cob_light
 rgb_light
 ```
 
+Default scenes:
+
+```text
+Day Fountain
+Night Glow
+Display Mode
+All Off
+```
+
 Important water-level note:
 
 The Smart Fountain may physically use a capacitive soil moisture sensor, but in Laravel its product role is:
@@ -660,8 +809,10 @@ The Laravel side already includes:
   - `device_capabilities`
   - `device_outputs`
   - `device_readings`
+  - `device_scenes`
   - `devices.last_reported_state`
 - Smart Fountain dashboard using generic `output_set` commands
+- Smart Fountain full-scene presets using `scene_apply` commands
 - Smart Fountain platform config API
 - Smart Fountain platform state sync API
 - Smart Fountain dashboard auto-refresh/status endpoint
@@ -739,15 +890,14 @@ The device identifies itself using:
 
 ## Known Incomplete Areas
 
-### 1. Generic schedules / scenes
+### 1. Generic schedule ranges
 
-Plant Bed currently has watering schedules. Persistent state devices need state-range schedules and scenes.
+Plant Bed currently has watering schedules. Persistent state devices need state-range schedules that apply scenes.
 
 Future direction:
 
 ```text
-device_schedules
-device_scenes
+device_schedule_ranges
 device_automation_rules
 ```
 
@@ -758,8 +908,8 @@ Plant Bed:
 Monday 06:00 → Water for 30 seconds
 
 Smart Fountain / Fan / Bathroom:
-Every day 06:00 to 20:00 → Apply daytime scene/state
-After 20:00 → Apply off/night scene
+Every day 06:00 to 20:00 → Apply Day scene
+After 20:00 → Apply Night/Off scene
 ```
 
 ### 2. Desired State vs Reported State
@@ -864,6 +1014,7 @@ When opening a new thread for a new device, preserve these platform rules:
 - keep failed/expired commands closed; do not replay them automatically on reconnect
 - use the shared command lifecycle service for timeout/cleanup behavior
 - show simple user-facing command states, not internal state jargon
-- use capabilities/outputs/readings for new device types
+- use capabilities/outputs/readings/scenes for new device types
 - make API responses device/request-specific; do not return unrelated Plant Bed fields for new devices
+- keep Plant Bed timed watering logic isolated from Smart Fountain persistent-state logic
 - keep existing Plant Bed functionality working while adding platform features
