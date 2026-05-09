@@ -24,23 +24,22 @@ class SmartFountainScheduleController extends Controller
         7 => 'Sunday',
     ];
 
+    private const PERIOD_ORDER = ['day', 'evening', 'night'];
+
     private const PERIODS = [
         'day' => [
             'name' => 'Day',
             'start_time' => '06:00:00',
-            'end_time' => '18:00:00',
             'scene_name' => 'Day Fountain',
         ],
         'evening' => [
             'name' => 'Evening',
             'start_time' => '18:00:00',
-            'end_time' => '23:00:00',
             'scene_name' => 'Night Glow',
         ],
         'night' => [
             'name' => 'Night',
             'start_time' => '23:00:00',
-            'end_time' => '06:00:00',
             'scene_name' => 'All Off',
         ],
     ];
@@ -65,7 +64,7 @@ class SmartFountainScheduleController extends Controller
 
         return redirect()
             ->route('devices.smart-fountain.schedules.index', $device)
-            ->with('success', 'Smart Fountain uses three fixed timeline blocks: Day, Evening, and Night. Edit one of them to change its time or scene.');
+            ->with('success', 'Smart Fountain uses three fixed timeline blocks: Day, Evening, and Night. Edit one of them to change its start time or scene.');
     }
 
     public function store(Request $request, Device $device): RedirectResponse
@@ -103,10 +102,13 @@ class SmartFountainScheduleController extends Controller
             abort(404);
         }
 
-        $validated = $this->validateSchedule($request, $device, $schedule);
-        $this->ensureNoConflictingRanges($device, $validated, $schedule);
+        $this->ensureTimelineBlocks($device);
+
+        $validated = $this->validateTimelineBlock($request, $device, $schedule);
+        $this->ensureValidTimelineOrder($device, (string) $schedule->period_key, $validated['start_time']);
 
         $schedule->update($validated);
+        $this->syncTimelineBoundaries($device);
 
         return redirect()
             ->route('devices.smart-fountain.schedules.index', $device)
@@ -119,19 +121,6 @@ class SmartFountainScheduleController extends Controller
 
         if (! array_key_exists((string) $schedule->period_key, self::PERIODS)) {
             abort(404);
-        }
-
-        if (! $schedule->is_enabled) {
-            $this->ensureNoConflictingRanges($device, [
-                'period_key' => $schedule->period_key,
-                'name' => $schedule->name,
-                'days_of_week' => $schedule->days_of_week ?? [],
-                'start_time' => $schedule->start_time,
-                'end_time' => $schedule->end_time,
-                'start_scene_id' => $schedule->start_scene_id,
-                'end_scene_id' => $schedule->end_scene_id,
-                'is_enabled' => true,
-            ], $schedule);
         }
 
         $schedule->update([
@@ -152,13 +141,12 @@ class SmartFountainScheduleController extends Controller
             ->withErrors(['schedule' => 'Timeline blocks cannot be deleted. Disable the block instead.']);
     }
 
-    private function validateSchedule(Request $request, Device $device, DeviceScheduleRange $schedule): array
+    private function validateTimelineBlock(Request $request, Device $device, DeviceScheduleRange $schedule): array
     {
         $validated = $request->validate([
             'days_of_week' => ['required', 'array', 'min:1'],
             'days_of_week.*' => ['integer', 'between:1,7'],
             'start_time' => ['required', 'date_format:H:i'],
-            'end_time' => ['required', 'date_format:H:i', 'different:start_time'],
             'start_scene_id' => [
                 'required',
                 Rule::exists('device_scenes', 'id')->where('device_id', $device->id),
@@ -176,7 +164,6 @@ class SmartFountainScheduleController extends Controller
             ->all();
 
         $validated['start_time'] = $validated['start_time'] . ':00';
-        $validated['end_time'] = $validated['end_time'] . ':00';
         $validated['end_scene_id'] = $validated['start_scene_id'];
         $validated['is_enabled'] = $request->boolean('is_enabled');
 
@@ -202,13 +189,75 @@ class SmartFountainScheduleController extends Controller
                     'name' => $period['name'],
                     'days_of_week' => [1, 2, 3, 4, 5, 6, 7],
                     'start_time' => $period['start_time'],
-                    'end_time' => $period['end_time'],
+                    'end_time' => $this->defaultEndTime($periodKey),
                     'start_scene_id' => $scene->id,
                     'end_scene_id' => $scene->id,
                     'is_enabled' => true,
                 ]
             );
         }
+
+        $this->syncTimelineBoundaries($device);
+    }
+
+    private function defaultEndTime(string $periodKey): string
+    {
+        return match ($periodKey) {
+            'day' => self::PERIODS['evening']['start_time'],
+            'evening' => self::PERIODS['night']['start_time'],
+            'night' => self::PERIODS['day']['start_time'],
+            default => '00:00:00',
+        };
+    }
+
+    private function syncTimelineBoundaries(Device $device): void
+    {
+        $blocks = $this->timelineBlocksByKey($device);
+
+        foreach (self::PERIOD_ORDER as $periodKey) {
+            $block = $blocks[$periodKey] ?? null;
+            $nextBlock = $blocks[$this->nextPeriodKey($periodKey)] ?? null;
+
+            if (! $block || ! $nextBlock) {
+                continue;
+            }
+
+            $block->update([
+                'name' => self::PERIODS[$periodKey]['name'],
+                'end_time' => $nextBlock->start_time,
+                'end_scene_id' => $block->start_scene_id,
+            ]);
+        }
+    }
+
+    private function ensureValidTimelineOrder(Device $device, string $changedPeriodKey, string $newStartTime): void
+    {
+        $blocks = $this->timelineBlocksByKey($device);
+        $startTimes = [];
+
+        foreach (self::PERIOD_ORDER as $periodKey) {
+            $startTimes[$periodKey] = $periodKey === $changedPeriodKey
+                ? $newStartTime
+                : ($blocks[$periodKey]?->start_time ?? self::PERIODS[$periodKey]['start_time']);
+        }
+
+        $dayStart = $this->timeToMinute($startTimes['day']);
+        $eveningStart = $this->timeToMinute($startTimes['evening']);
+        $nightStart = $this->timeToMinute($startTimes['night']);
+
+        if (! ($dayStart < $eveningStart && $eveningStart < $nightStart)) {
+            throw ValidationException::withMessages([
+                'start_time' => 'Timeline order must stay Day start < Evening start < Night start. Example: Day 06:00, Evening 18:00, Night 23:00.',
+            ]);
+        }
+    }
+
+    private function timelineBlocksByKey(Device $device)
+    {
+        return $device->scheduleRanges()
+            ->whereIn('period_key', self::PERIOD_ORDER)
+            ->get()
+            ->keyBy('period_key');
     }
 
     private function sceneByName(Device $device, string $name)
@@ -224,91 +273,20 @@ class SmartFountainScheduleController extends Controller
             'scheduleRanges.endScene',
         ]);
 
-        return collect(array_keys(self::PERIODS))
+        return collect(self::PERIOD_ORDER)
             ->map(fn ($periodKey) => $device->scheduleRanges->firstWhere('period_key', $periodKey))
             ->filter()
             ->values();
     }
 
-    private function ensureNoConflictingRanges(Device $device, array $validated, ?DeviceScheduleRange $ignoreSchedule = null): void
+    private function nextPeriodKey(string $periodKey): string
     {
-        if (! ($validated['is_enabled'] ?? false)) {
-            return;
-        }
-
-        $newRanges = $this->expandScheduleRanges(
-            days: $validated['days_of_week'],
-            startTime: $validated['start_time'],
-            endTime: $validated['end_time']
-        );
-
-        $existingSchedules = $device->scheduleRanges()
-            ->when($ignoreSchedule, fn ($query) => $query->whereKeyNot($ignoreSchedule->id))
-            ->whereIn('period_key', array_keys(self::PERIODS))
-            ->where('is_enabled', true)
-            ->get();
-
-        foreach ($existingSchedules as $existingSchedule) {
-            $existingRanges = $this->expandScheduleRanges(
-                days: $existingSchedule->days_of_week ?? [],
-                startTime: $existingSchedule->start_time,
-                endTime: $existingSchedule->end_time
-            );
-
-            foreach ($newRanges as $newRange) {
-                foreach ($existingRanges as $existingRange) {
-                    if ($newRange['day'] !== $existingRange['day']) {
-                        continue;
-                    }
-
-                    if ($this->rangesOverlap($newRange, $existingRange)) {
-                        throw ValidationException::withMessages([
-                            'start_time' => "Timeline block overlaps with '{$existingSchedule->name}'. Adjust the time range or disable the other block first.",
-                        ]);
-                    }
-                }
-            }
-        }
-    }
-
-    private function expandScheduleRanges(array $days, string $startTime, string $endTime): array
-    {
-        $startMinute = $this->timeToMinute($startTime);
-        $endMinute = $this->timeToMinute($endTime);
-        $ranges = [];
-
-        foreach ($days as $day) {
-            $day = (int) $day;
-
-            if ($startMinute < $endMinute) {
-                $ranges[] = [
-                    'day' => $day,
-                    'start' => $startMinute,
-                    'end' => $endMinute,
-                ];
-
-                continue;
-            }
-
-            $ranges[] = [
-                'day' => $day,
-                'start' => $startMinute,
-                'end' => 1440,
-            ];
-
-            $ranges[] = [
-                'day' => $this->nextDay($day),
-                'start' => 0,
-                'end' => $endMinute,
-            ];
-        }
-
-        return $ranges;
-    }
-
-    private function rangesOverlap(array $first, array $second): bool
-    {
-        return $first['start'] < $second['end'] && $second['start'] < $first['end'];
+        return match ($periodKey) {
+            'day' => 'evening',
+            'evening' => 'night',
+            'night' => 'day',
+            default => 'day',
+        };
     }
 
     private function timeToMinute(string $time): int
@@ -316,11 +294,6 @@ class SmartFountainScheduleController extends Controller
         [$hour, $minute] = array_map('intval', explode(':', substr($time, 0, 5)));
 
         return ($hour * 60) + $minute;
-    }
-
-    private function nextDay(int $day): int
-    {
-        return $day === 7 ? 1 : $day + 1;
     }
 
     private function authorizeSchedule(Device $device, DeviceScheduleRange $schedule): void
