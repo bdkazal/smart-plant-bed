@@ -41,11 +41,19 @@ class SmartFountainSceneController extends Controller
     {
         $this->authorizeSmartFountain($device);
 
+        $outputs = $this->validatedOutputs($request);
+
+        if (empty($outputs)) {
+            return back()
+                ->withErrors(['outputs' => 'Select at least one output for this scene.'])
+                ->withInput();
+        }
+
         $device->scenes()->create([
             'name' => $request->validate([
                 'name' => ['required', 'string', 'max:100', 'unique:device_scenes,name,NULL,id,device_id,' . $device->id],
             ])['name'],
-            'outputs' => $this->validatedOutputs($request),
+            'outputs' => $outputs,
             'is_default' => false,
         ]);
 
@@ -69,13 +77,21 @@ class SmartFountainSceneController extends Controller
     {
         $this->authorizeScene($device, $scene);
 
+        $outputs = $this->validatedOutputs($request);
+
+        if (empty($outputs)) {
+            return back()
+                ->withErrors(['outputs' => 'Select at least one output for this scene.'])
+                ->withInput();
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:100', 'unique:device_scenes,name,' . $scene->id . ',id,device_id,' . $device->id],
         ]);
 
         $scene->update([
             'name' => $validated['name'],
-            'outputs' => $this->validatedOutputs($request),
+            'outputs' => $outputs,
         ]);
 
         return redirect()
@@ -139,33 +155,48 @@ class SmartFountainSceneController extends Controller
 
     private function validatedOutputs(Request $request): array
     {
-        $validated = $request->validate([
+        $request->validate([
+            'pump_include' => ['nullable', 'boolean'],
             'pump_enabled' => ['nullable', 'boolean'],
-            'pump_speed_percent' => ['required', 'integer', 'min:0', 'max:100'],
+            'pump_speed_percent' => ['required_if:pump_include,1', 'nullable', 'integer', 'min:0', 'max:100'],
+
+            'cob_light_include' => ['nullable', 'boolean'],
             'cob_light_enabled' => ['nullable', 'boolean'],
-            'cob_brightness_percent' => ['required', 'integer', 'min:0', 'max:100'],
+            'cob_brightness_percent' => ['required_if:cob_light_include,1', 'nullable', 'integer', 'min:0', 'max:100'],
+
+            'rgb_light_include' => ['nullable', 'boolean'],
             'rgb_light_enabled' => ['nullable', 'boolean'],
-            'rgb_brightness_percent' => ['required', 'integer', 'min:0', 'max:100'],
-            'rgb_color' => ['required', 'regex:/^#[0-9A-Fa-f]{6}$/'],
-            'rgb_effect' => ['required', 'in:solid,breathing,slow_rainbow,warm_glow,water_shimmer,night_mode'],
+            'rgb_brightness_percent' => ['required_if:rgb_light_include,1', 'nullable', 'integer', 'min:0', 'max:100'],
+            'rgb_color' => ['required_if:rgb_light_include,1', 'nullable', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+            'rgb_effect' => ['required_if:rgb_light_include,1', 'nullable', 'in:solid,breathing,slow_rainbow,warm_glow,water_shimmer,night_mode'],
         ]);
 
-        return [
-            'pump' => [
+        $outputs = [];
+
+        if ($request->boolean('pump_include')) {
+            $outputs['pump'] = [
                 'enabled' => $request->boolean('pump_enabled'),
-                'speed_percent' => (int) $validated['pump_speed_percent'],
-            ],
-            'cob_light' => [
+                'speed_percent' => (int) $request->input('pump_speed_percent', 0),
+            ];
+        }
+
+        if ($request->boolean('cob_light_include')) {
+            $outputs['cob_light'] = [
                 'enabled' => $request->boolean('cob_light_enabled'),
-                'brightness_percent' => (int) $validated['cob_brightness_percent'],
-            ],
-            'rgb_light' => [
+                'brightness_percent' => (int) $request->input('cob_brightness_percent', 0),
+            ];
+        }
+
+        if ($request->boolean('rgb_light_include')) {
+            $outputs['rgb_light'] = [
                 'enabled' => $request->boolean('rgb_light_enabled'),
-                'brightness_percent' => (int) $validated['rgb_brightness_percent'],
-                'color' => strtoupper($validated['rgb_color']),
-                'effect' => $validated['rgb_effect'],
-            ],
-        ];
+                'brightness_percent' => (int) $request->input('rgb_brightness_percent', 0),
+                'color' => strtoupper((string) $request->input('rgb_color', '#FFB066')),
+                'effect' => (string) $request->input('rgb_effect', 'warm_glow'),
+            ];
+        }
+
+        return $outputs;
     }
 
     private function defaultOutputs(): array
