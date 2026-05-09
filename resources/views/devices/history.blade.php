@@ -15,10 +15,16 @@
         </div>
 
         <div class="mb-4 flex flex-wrap gap-2">
-            <a href="{{ route('devices.show', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">Home</a>
-            <a href="{{ route('devices.automation', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">Automation</a>
-            <a href="{{ route('devices.schedules.index', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">Schedules</a>
-            <a href="{{ route('devices.history', $device) }}" class="rounded bg-blue-600 px-3 py-2 text-sm text-white">History</a>
+            @if ($device->isSmartFountain())
+                <a href="{{ route('devices.show', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">Home</a>
+                <a href="{{ route('devices.smart-fountain.scenes.index', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">Scenes</a>
+                <a href="{{ route('devices.history', $device) }}" class="rounded bg-blue-600 px-3 py-2 text-sm text-white">History</a>
+            @else
+                <a href="{{ route('devices.show', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">Home</a>
+                <a href="{{ route('devices.automation', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">Automation</a>
+                <a href="{{ route('devices.schedules.index', $device) }}" class="rounded bg-white px-3 py-2 text-sm border">Schedules</a>
+                <a href="{{ route('devices.history', $device) }}" class="rounded bg-blue-600 px-3 py-2 text-sm text-white">History</a>
+            @endif
         </div>
 
         @if (session('success'))
