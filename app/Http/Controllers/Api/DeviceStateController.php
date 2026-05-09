@@ -90,12 +90,11 @@ class DeviceStateController extends Controller
         ]);
 
         $storedReading = null;
+        $hasLegacySensorReadingPayload = array_key_exists('temperature', $validated)
+            || array_key_exists('humidity', $validated)
+            || array_key_exists('soil_moisture', $validated);
 
-        if (
-            array_key_exists('temperature', $validated) ||
-            array_key_exists('humidity', $validated) ||
-            array_key_exists('soil_moisture', $validated)
-        ) {
+        if ($hasLegacySensorReadingPayload) {
             $storedReading = SensorReading::create([
                 'device_id' => $device->id,
                 'temperature' => $validated['temperature'] ?? null,
@@ -109,27 +108,77 @@ class DeviceStateController extends Controller
         $storedDeviceReadings = $this->storePlatformReadings($device, $validated['readings'] ?? []);
         $acceptedCompletedCommandId = $this->markCompletedCommand($device, $validated['last_completed_command_id'] ?? null);
 
-        return response()->json([
+        return response()->json($this->buildResponsePayload(
+            device: $device,
+            storedReading: $storedReading,
+            hasLegacySensorReadingPayload: $hasLegacySensorReadingPayload,
+            updatedOutputs: $updatedOutputs,
+            storedDeviceReadings: $storedDeviceReadings,
+            acceptedCompletedCommandId: $acceptedCompletedCommandId,
+            hasOutputsPayload: array_key_exists('outputs', $validated),
+            hasReadingsPayload: array_key_exists('readings', $validated),
+            hasValveStatePayload: array_key_exists('valve_state', $validated),
+            hasWateringStatePayload: array_key_exists('watering_state', $validated),
+        ));
+    }
+
+    private function buildResponsePayload(
+        Device $device,
+        ?SensorReading $storedReading,
+        bool $hasLegacySensorReadingPayload,
+        int $updatedOutputs,
+        int $storedDeviceReadings,
+        ?int $acceptedCompletedCommandId,
+        bool $hasOutputsPayload,
+        bool $hasReadingsPayload,
+        bool $hasValveStatePayload,
+        bool $hasWateringStatePayload,
+    ): array {
+        $freshDevice = $device->fresh();
+
+        $state = [
+            'operation_state' => $freshDevice->last_reported_operation_state,
+            'last_reported_at' => $freshDevice->last_reported_at?->format('Y-m-d H:i:s'),
+        ];
+
+        if ($hasValveStatePayload) {
+            $state['valve_state'] = $freshDevice->last_reported_valve_state;
+        }
+
+        if ($hasWateringStatePayload) {
+            $state['watering_state'] = $freshDevice->last_reported_watering_state;
+        }
+
+        if ($hasOutputsPayload) {
+            $state['outputs'] = $device->outputs()->get(['key', 'type', 'name', 'state', 'last_changed_source', 'last_changed_at']);
+        }
+
+        $response = [
             'message' => 'Device state synced successfully.',
             'device_id' => $device->id,
-            'state' => [
-                'operation_state' => $device->fresh()->last_reported_operation_state,
-                'valve_state' => $device->fresh()->last_reported_valve_state,
-                'watering_state' => $device->fresh()->last_reported_watering_state,
-                'outputs' => $device->outputs()->get(['key', 'type', 'name', 'state', 'last_changed_source', 'last_changed_at']),
-                'last_reported_at' => $device->fresh()->last_reported_at?->format('Y-m-d H:i:s'),
-            ],
-            'legacy_sensor_reading_stored' => (bool) $storedReading,
-            'legacy_sensor_reading_id' => $storedReading?->id,
-            'platform_outputs_updated' => $updatedOutputs,
-            'device_readings_stored' => $storedDeviceReadings,
+            'device_type' => $device->device_type,
+            'state' => $state,
             'accepted_completed_command_id' => $acceptedCompletedCommandId,
+        ];
 
-            // Deprecated MVP transition keys. Prefer the clearer keys above.
-            'reading_stored' => (bool) $storedReading,
-            'reading_id' => $storedReading?->id,
-            'platform_readings_stored' => $storedDeviceReadings,
-        ]);
+        if ($hasOutputsPayload) {
+            $response['platform_outputs_updated'] = $updatedOutputs;
+        }
+
+        if ($hasReadingsPayload) {
+            $response['device_readings_stored'] = $storedDeviceReadings;
+        }
+
+        if ($hasLegacySensorReadingPayload) {
+            $response['legacy_sensor_reading_stored'] = (bool) $storedReading;
+            $response['legacy_sensor_reading_id'] = $storedReading?->id;
+
+            // Deprecated MVP transition keys for older Plant Bed tests/firmware.
+            $response['reading_stored'] = (bool) $storedReading;
+            $response['reading_id'] = $storedReading?->id;
+        }
+
+        return $response;
     }
 
     private function syncPlatformOutputs(Device $device, array $outputs): int
