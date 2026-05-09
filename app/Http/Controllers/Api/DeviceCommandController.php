@@ -194,6 +194,10 @@ class DeviceCommandController extends Controller
             if ($command->command_type === 'output_set') {
                 $this->applyOutputSetCommand($device, $command);
             }
+
+            if ($command->command_type === 'scene_apply') {
+                $this->applySceneCommand($device, $command);
+            }
         }
 
         if ($validated['status'] === 'failed') {
@@ -229,6 +233,38 @@ class DeviceCommandController extends Controller
             return;
         }
 
+        $this->applyOutputState(
+            device: $device,
+            outputKey: $outputKey,
+            state: $state,
+            source: data_get($command->payload, 'source', 'device_ack')
+        );
+    }
+
+    private function applySceneCommand(Device $device, DeviceCommand $command): void
+    {
+        $outputs = data_get($command->payload, 'outputs', []);
+
+        if (! is_array($outputs)) {
+            return;
+        }
+
+        foreach ($outputs as $outputKey => $state) {
+            if (! is_string($outputKey) || ! is_array($state)) {
+                continue;
+            }
+
+            $this->applyOutputState(
+                device: $device,
+                outputKey: $outputKey,
+                state: $state,
+                source: data_get($command->payload, 'source', 'scene_apply')
+            );
+        }
+    }
+
+    private function applyOutputState(Device $device, string $outputKey, array $state, string $source): void
+    {
         $deviceOutput = $device->outputs()
             ->where('key', $outputKey)
             ->first();
@@ -239,7 +275,7 @@ class DeviceCommandController extends Controller
 
         $deviceOutput->update([
             'state' => array_merge($deviceOutput->state ?? [], $state),
-            'last_changed_source' => data_get($command->payload, 'source', 'device_ack'),
+            'last_changed_source' => $source,
             'last_changed_at' => now(),
         ]);
     }
