@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DeviceClaimController;
 use App\Http\Controllers\DeviceController;
+use App\Http\Controllers\SmartFountainSceneController;
 use App\Http\Controllers\SmartFountainStatusController;
 use App\Http\Controllers\WateringScheduleController;
 use Illuminate\Support\Facades\Auth;
@@ -29,6 +30,21 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/devices/{device}/smart-fountain/status', SmartFountainStatusController::class)->name('devices.smart-fountain.status');
     Route::get('/devices/{device}/automation', [DeviceController::class, 'automation'])->name('devices.automation');
     Route::get('/devices/{device}/history', [DeviceController::class, 'history'])->name('devices.history');
+
+    Route::get('/devices/{device}/smart-fountain/scenes', [SmartFountainSceneController::class, 'index'])
+        ->name('devices.smart-fountain.scenes.index');
+    Route::get('/devices/{device}/smart-fountain/scenes/create', [SmartFountainSceneController::class, 'create'])
+        ->name('devices.smart-fountain.scenes.create');
+    Route::post('/devices/{device}/smart-fountain/scenes', [SmartFountainSceneController::class, 'store'])
+        ->name('devices.smart-fountain.scenes.store');
+    Route::get('/devices/{device}/smart-fountain/scenes/{scene}/edit', [SmartFountainSceneController::class, 'edit'])
+        ->name('devices.smart-fountain.scenes.edit');
+    Route::put('/devices/{device}/smart-fountain/scenes/{scene}', [SmartFountainSceneController::class, 'update'])
+        ->name('devices.smart-fountain.scenes.update');
+    Route::delete('/devices/{device}/smart-fountain/scenes/{scene}', [SmartFountainSceneController::class, 'destroy'])
+        ->name('devices.smart-fountain.scenes.destroy');
+    Route::post('/devices/{device}/smart-fountain/scenes/{scene}/apply', [SmartFountainSceneController::class, 'apply'])
+        ->name('devices.smart-fountain.scenes.apply');
 
     Route::post('/devices/{device}/settings', [DeviceController::class, 'updateSettings'])->name('devices.settings.update');
     Route::post('/devices/{device}/water-now', [DeviceController::class, 'waterNow'])->name('devices.water-now');
