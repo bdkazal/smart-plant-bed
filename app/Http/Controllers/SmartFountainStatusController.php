@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Device;
+use App\Services\DeviceCommandLifecycleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
 
@@ -19,6 +20,8 @@ class SmartFountainStatusController extends Controller
         if (! $device->isSmartFountain()) {
             abort(404);
         }
+
+        app(DeviceCommandLifecycleService::class)->cleanupStaleCommands($device);
 
         $device->load([
             'outputs',
