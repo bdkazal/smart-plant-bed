@@ -106,33 +106,31 @@ class SmartFountainSceneController extends Controller
                 ]);
         }
 
-        foreach (($scene->outputs ?? []) as $outputKey => $state) {
-            if (! is_array($state)) {
-                continue;
-            }
+        $outputs = collect($scene->outputs ?? [])
+            ->filter(fn ($state, $outputKey) => is_string($outputKey) && is_array($state))
+            ->filter(fn ($state, $outputKey) => $device->outputs()->where('key', $outputKey)->exists())
+            ->all();
 
-            $deviceOutput = $device->outputs()
-                ->where('key', $outputKey)
-                ->first();
-
-            if (! $deviceOutput) {
-                continue;
-            }
-
-            DeviceCommand::create([
-                'device_id' => $device->id,
-                'command_type' => 'output_set',
-                'payload' => [
-                    'output' => $deviceOutput->key,
-                    'state' => $state,
-                    'source' => 'scene:' . $scene->id,
-                    'scene_id' => $scene->id,
-                    'scene_name' => $scene->name,
-                ],
-                'status' => 'pending',
-                'issued_at' => now(),
-            ]);
+        if (empty($outputs)) {
+            return redirect()
+                ->route('devices.smart-fountain.scenes.index', $device)
+                ->withErrors([
+                    'scene' => 'This scene has no valid outputs to apply.',
+                ]);
         }
+
+        DeviceCommand::create([
+            'device_id' => $device->id,
+            'command_type' => 'scene_apply',
+            'payload' => [
+                'scene_id' => $scene->id,
+                'scene_name' => $scene->name,
+                'source' => 'scene:' . $scene->id,
+                'outputs' => $outputs,
+            ],
+            'status' => 'pending',
+            'issued_at' => now(),
+        ]);
 
         return redirect()
             ->route('devices.show', $device)
