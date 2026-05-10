@@ -14,3 +14,32 @@
 .mode-chips {
     display: none !important;
 }
+
+/* Smart Fountain dashboard polish: keep hero compact and move last sync to the bottom. */
+body.smart-fountain-dashboard .hero-meta {
+    grid-template-columns: 1fr !important;
+}
+
+body.smart-fountain-dashboard .hero-meta .meta-card:first-child {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 42px;
+}
+
+body.smart-fountain-dashboard .hero-meta .meta-card:first-child .meta-label,
+body.smart-fountain-dashboard .hero-meta .meta-card:first-child .meta-value {
+    margin: 0 !important;
+}
+
+body.smart-fountain-dashboard .hero-meta .meta-card:first-child .meta-label::after {
+    content: ':';
+}
+
+body.smart-fountain-dashboard .smart-fountain-last-sync {
+    margin: 14px 0 0;
+    text-align: center;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+}
