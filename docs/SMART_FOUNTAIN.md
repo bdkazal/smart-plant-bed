@@ -126,6 +126,49 @@ Applying a scene creates one command:
 command_type = scene_apply
 ```
 
+## Low water pump protection
+
+Smart Fountain uses water-level safety to protect the pump.
+
+When latest `water_low` is true:
+
+```text
+pump must stay OFF
+lights/RGB may still work
+```
+
+Laravel has a Smart Fountain safety service:
+
+```text
+app/Services/SmartFountainSafetyService.php
+```
+
+The service checks the latest `water_low` device reading and can force pump state to:
+
+```json
+{
+  "enabled": false,
+  "speed_percent": 0,
+  "safety_override": "water_low"
+}
+```
+
+Current backend protection:
+
+```text
+output_set pump ON while water_low=true → command payload is changed to safe pump OFF
+scene_apply while water_low=true       → scene payload keeps lights/RGB but forces pump OFF
+schedule scene_apply while water_low=true uses the same DeviceCommand protection
+```
+
+Important firmware rule:
+
+```text
+ESP32 must also protect the pump locally.
+If water_low is true, firmware should immediately turn pump OFF and ignore pump ON commands.
+Laravel protection is helpful, but hardware safety must not depend only on internet/server availability.
+```
+
 ## Daily Timeline schedule
 
 Smart Fountain uses a simple V1 daily timeline schedule instead of an advanced automation page.
