@@ -777,7 +777,7 @@
             </main>
         </div>
 
-        <script>
+        <!-- <script>
             const statusUrl = "{{ route('devices.status', $device) }}";
 
             function setText(id, value) {
@@ -932,7 +932,7 @@
                     flashSuccess.remove();
                 }, 5000);
             }
-        </script>
+        </script> -->
 </body>
 
 </html>
