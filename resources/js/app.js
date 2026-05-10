@@ -153,7 +153,40 @@ async function refreshPlantBedDashboard() {
     }
 }
 
+function polishSmartFountainDashboard() {
+    if (!document.getElementById('water-gauge')) {
+        return;
+    }
+
+    document.body.classList.add('smart-fountain-dashboard');
+
+    const metaCards = document.querySelectorAll('.hero-meta .meta-card');
+    const locationCard = metaCards[0];
+    const lastSeenCard = metaCards[1];
+    const appContent = document.querySelector('.app-content');
+
+    if (locationCard) {
+        locationCard.classList.add('location-inline-card');
+    }
+
+    if (!lastSeenCard || !appContent || document.getElementById('smart-fountain-last-sync')) {
+        return;
+    }
+
+    const lastSeenValue = lastSeenCard.querySelector('#device-last-seen');
+    const initialText = lastSeenValue?.textContent?.trim() || 'Never';
+
+    const syncText = document.createElement('p');
+    syncText.id = 'smart-fountain-last-sync';
+    syncText.className = 'smart-fountain-last-sync';
+    syncText.innerHTML = `Last synced: <span id="device-last-seen">${initialText}</span>`;
+
+    lastSeenCard.remove();
+    appContent.appendChild(syncText);
+}
+
 window.addEventListener('DOMContentLoaded', () => {
     refreshPlantBedDashboard();
     setInterval(refreshPlantBedDashboard, 5000);
+    polishSmartFountainDashboard();
 });
