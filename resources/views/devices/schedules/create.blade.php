@@ -81,6 +81,10 @@
 </head>
 
 <body>
+    @php
+        $maxScheduleDuration = $device->wateringRule?->max_watering_duration_seconds ?? 300;
+    @endphp
+
     <div class="page-shell">
         <a href="{{ route('devices.schedules.index', $device) }}" class="back-link">← Back to Schedules</a>
 
@@ -129,8 +133,8 @@
 
                             <div class="field">
                                 <label for="duration_seconds" class="label">Duration (seconds)</label>
-                                <input type="number" name="duration_seconds" id="duration_seconds" min="1" max="300" value="{{ old('duration_seconds', 30) }}" class="input" required>
-                                <p class="hint">Keep this within the safe watering duration for your pump and soil.</p>
+                                <input type="number" name="duration_seconds" id="duration_seconds" min="1" max="{{ $maxScheduleDuration }}" value="{{ old('duration_seconds', min(30, $maxScheduleDuration)) }}" class="input" required>
+                                <p class="hint">Maximum allowed: {{ $maxScheduleDuration }} seconds.</p>
                             </div>
 
                             <label class="toggle-row" for="is_enabled">
