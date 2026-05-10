@@ -82,8 +82,7 @@
         .filter-chip.active { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
 
         .section-label { margin: 14px 0 10px; color: var(--text-muted); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
-
-        .activity-list { position: relative; display: grid; gap: 12px; }
+        .activity-list { display: grid; gap: 12px; }
         .activity-card {
             display: grid; grid-template-columns: 42px 1fr; gap: 12px;
             border-radius: 22px; border: 1px solid rgba(255,255,255,.86); background: rgba(255,255,255,.80);
@@ -101,7 +100,7 @@
 
         .status-pill { flex: 0 0 auto; border-radius: 999px; padding: 5px 8px; font-size: 11px; font-weight: 900; text-transform: uppercase; }
         .status-executed, .status-completed, .status-finished { background: #dcfce7; color: #166534; }
-        .status-pending, .status-waiting { background: #fef3c7; color: #92400e; }
+        .status-pending, .status-waiting, .status-requested { background: #fef3c7; color: #92400e; }
         .status-acknowledged, .status-watering, .status-running { background: #dbeafe; color: #1d4ed8; }
         .status-failed, .status-expired, .status-cancelled { background: #fee2e2; color: #991b1b; }
         .status-default { background: #e5e7eb; color: #475569; }
@@ -120,7 +119,6 @@
         }
         .empty-state h2 { margin: 0 0 6px; font-size: 18px; font-weight: 950; }
         .empty-state p { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 1.45; }
-        .pagination-wrap { margin-top: 14px; }
 
         @media (max-width: 420px) {
             .page-shell { padding-left: 10px; padding-right: 10px; }
@@ -137,12 +135,12 @@
         $isSmartFountain = $device->isSmartFountain();
         $filter = $filter ?? request('filter', 'all');
         $filterUrl = fn (string $name) => route('devices.history', ['device' => $device, 'filter' => $name]);
-        $isPaginator = fn ($value) => is_object($value) && method_exists($value, 'links');
-        $totalOf = fn ($value) => is_object($value) && method_exists($value, 'total') ? $value->total() : (is_countable($value) ? count($value) : 0);
+        $visibleCount = fn ($value) => is_countable($value) ? count($value) : 0;
 
-        $commandCount = $totalOf($deviceCommands);
-        $readingCount = $isSmartFountain ? $totalOf($platformReadings) : $totalOf($sensorReadings ?? collect());
-        $wateringLogCount = $isSmartFountain ? 0 : $totalOf($wateringLogs);
+        $readingCount = $isSmartFountain ? $visibleCount($platformReadings) : $visibleCount($sensorReadings ?? collect());
+        $actionCount = $isSmartFountain
+            ? $visibleCount($deviceCommands)
+            : ($visibleCount($wateringLogs) + $visibleCount($deviceCommands));
 
         $statusClass = function (?string $status) {
             $key = strtolower((string) $status);
@@ -205,6 +203,10 @@
                 return $source . (count($parts) ? ' • ' . implode(' • ', $parts) : '');
             }
 
+            if ($command->command_type === 'valve_on') {
+                return 'Duration: ' . data_get($payload, 'duration_seconds', 'N/A') . ' sec';
+            }
+
             if ($command->command_type === 'output_set') {
                 $state = data_get($payload, 'state', []);
                 $parts = [];
@@ -221,15 +223,7 @@
                     $parts[] = data_get($state, 'brightness_percent') . '% brightness';
                 }
 
-                if (array_key_exists('effect', $state)) {
-                    $parts[] = ucwords(str_replace('_', ' ', data_get($state, 'effect')));
-                }
-
                 return count($parts) ? implode(' • ', $parts) : 'Output command sent to device.';
-            }
-
-            if ($command->command_type === 'valve_on') {
-                return 'Duration: ' . data_get($payload, 'duration_seconds', 'N/A') . ' sec';
             }
 
             return 'Device command was sent from the platform.';
@@ -272,18 +266,18 @@
                 <div class="app-content">
                     <section class="hero">
                         <p class="eyebrow">{{ $device->displayType() }}</p>
-                        <h1 class="title">Activity History</h1>
-                        <p class="subtitle">A clean review of recent readings, actions, schedules, and device command results.</p>
+                        <h1 class="title">Recent Activity</h1>
+                        <p class="subtitle">Latest useful readings and actions. Older records stay in the database for debugging and cleanup later.</p>
                     </section>
 
                     <section class="summary-grid">
                         <div class="summary-card">
-                            <p class="summary-label">{{ $isSmartFountain ? 'Device Readings' : 'Sensor Readings' }}</p>
-                            <p class="summary-value">{{ $readingCount }}</p>
+                            <p class="summary-label">{{ $isSmartFountain ? 'Recent Readings' : 'Recent Sensor Readings' }}</p>
+                            <p class="summary-value">{{ $readingCount }} shown</p>
                         </div>
                         <div class="summary-card">
-                            <p class="summary-label">{{ $isSmartFountain ? 'Device Actions' : 'Watering Actions' }}</p>
-                            <p class="summary-value">{{ $isSmartFountain ? $commandCount : ($wateringLogCount + $commandCount) }}</p>
+                            <p class="summary-label">{{ $isSmartFountain ? 'Recent Actions' : 'Recent Watering Actions' }}</p>
+                            <p class="summary-value">{{ $actionCount }} shown</p>
                         </div>
                     </section>
 
@@ -303,7 +297,6 @@
                                         $metricLabel = ucwords(str_replace('_', ' ', $reading->metric));
                                         $isWaterLow = $reading->metric === 'water_low' && (int) $reading->value === 1;
                                     @endphp
-
                                     <article class="activity-card">
                                         <div class="activity-icon">{{ $isWaterLow ? '⚠️' : '💧' }}</div>
                                         <div>
@@ -313,30 +306,14 @@
                                             </div>
                                             <p class="activity-time">{{ $formatTime($reading->recorded_at) }}</p>
                                             <p class="activity-details">{{ $metricLabel }}: {{ $reading->value }} {{ $reading->unit }}</p>
-
-                                            <details class="tech-details">
-                                                <summary>Technical details</summary>
-                                                <pre class="tech-pre">{{ json_encode([
-                                                    'metric' => $reading->metric,
-                                                    'value' => $reading->value,
-                                                    'unit' => $reading->unit,
-                                                    'metadata' => $reading->metadata,
-                                                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                            </details>
+                                            <details class="tech-details"><summary>Technical details</summary><pre class="tech-pre">{{ json_encode(['metric' => $reading->metric, 'value' => $reading->value, 'unit' => $reading->unit, 'metadata' => $reading->metadata], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre></details>
                                         </div>
                                     </article>
                                 @empty
-                                    <div class="empty-state">
-                                        <h2>No readings found</h2>
-                                        <p>Device readings matching this filter will appear here.</p>
-                                    </div>
+                                    <div class="empty-state"><h2>No readings found</h2><p>Device readings matching this filter will appear here.</p></div>
                                 @endforelse
                             </div>
                         </section>
-
-                        @if ($isPaginator($platformReadings))
-                            <div class="pagination-wrap">{{ $platformReadings->links() }}</div>
-                        @endif
                     @endif
 
                     @if (! $isSmartFountain && in_array($filter, ['all', 'readings'], true))
@@ -348,11 +325,8 @@
                                         $soil = is_null($reading->soil_moisture) ? 'N/A' : $reading->soil_moisture . '%';
                                         $temperature = is_null($reading->temperature) ? 'N/A' : $reading->temperature . '°C';
                                         $humidity = is_null($reading->humidity) ? 'N/A' : $reading->humidity . '%';
-                                        $soilStatus = is_null($reading->soil_moisture)
-                                            ? 'No reading'
-                                            : ((int) $reading->soil_moisture < 35 ? 'Dry' : ((int) $reading->soil_moisture > 85 ? 'Wet' : 'Optimal'));
+                                        $soilStatus = is_null($reading->soil_moisture) ? 'No reading' : ((int) $reading->soil_moisture < 35 ? 'Dry' : ((int) $reading->soil_moisture > 85 ? 'Wet' : 'Optimal'));
                                     @endphp
-
                                     <article class="activity-card">
                                         <div class="activity-icon">🌱</div>
                                         <div>
@@ -362,31 +336,14 @@
                                             </div>
                                             <p class="activity-time">{{ $formatTime($reading->recorded_at ?? $reading->created_at) }}</p>
                                             <p class="activity-details">Soil: {{ $soil }} • Temp: {{ $temperature }} • Humidity: {{ $humidity }}</p>
-
-                                            <details class="tech-details">
-                                                <summary>Technical details</summary>
-                                                <pre class="tech-pre">{{ json_encode([
-                                                    'soil_moisture' => $reading->soil_moisture,
-                                                    'temperature' => $reading->temperature,
-                                                    'humidity' => $reading->humidity,
-                                                    'recorded_at' => $reading->recorded_at?->format('Y-m-d H:i:s'),
-                                                    'created_at' => $reading->created_at?->format('Y-m-d H:i:s'),
-                                                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                            </details>
+                                            <details class="tech-details"><summary>Technical details</summary><pre class="tech-pre">{{ json_encode(['soil_moisture' => $reading->soil_moisture, 'temperature' => $reading->temperature, 'humidity' => $reading->humidity, 'recorded_at' => $reading->recorded_at?->format('Y-m-d H:i:s'), 'created_at' => $reading->created_at?->format('Y-m-d H:i:s')], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre></details>
                                         </div>
                                     </article>
                                 @empty
-                                    <div class="empty-state">
-                                        <h2>No sensor readings found</h2>
-                                        <p>Soil moisture, temperature, and humidity readings will appear here.</p>
-                                    </div>
+                                    <div class="empty-state"><h2>No sensor readings found</h2><p>Soil moisture, temperature, and humidity readings will appear here.</p></div>
                                 @endforelse
                             </div>
                         </section>
-
-                        @if ($isPaginator($sensorReadings))
-                            <div class="pagination-wrap">{{ $sensorReadings->links() }}</div>
-                        @endif
                     @endif
 
                     @if (! $isSmartFountain && in_array($filter, ['all', 'actions', 'errors'], true))
@@ -405,7 +362,6 @@
                                             default => $trigger . ' watering ' . ($log->status ? strtolower($log->status) : 'logged'),
                                         };
                                     @endphp
-
                                     <article class="activity-card">
                                         <div class="activity-icon">{{ $isError ? '⚠️' : '💧' }}</div>
                                         <div>
@@ -414,42 +370,15 @@
                                                 <span class="status-pill {{ $statusClass($log->status) }}">{{ ucfirst($log->status ?? 'Logged') }}</span>
                                             </div>
                                             <p class="activity-time">{{ $formatTime($log->started_at ?? $log->created_at) }}</p>
-                                            <p class="activity-details">
-                                                Duration: {{ $log->duration_seconds }} sec
-                                                @if ($log->ended_at)
-                                                    • Ended {{ $log->ended_at->format('h:i A') }}
-                                                @endif
-                                                @if ($log->notes)
-                                                    • {{ $log->notes }}
-                                                @endif
-                                            </p>
-
-                                            <details class="tech-details">
-                                                <summary>Technical details</summary>
-                                                <pre class="tech-pre">{{ json_encode([
-                                                    'trigger_type' => $log->trigger_type,
-                                                    'duration_seconds' => $log->duration_seconds,
-                                                    'status' => $log->status,
-                                                    'started_at' => $log->started_at?->format('Y-m-d H:i:s'),
-                                                    'ended_at' => $log->ended_at?->format('Y-m-d H:i:s'),
-                                                    'created_at' => $log->created_at?->format('Y-m-d H:i:s'),
-                                                    'notes' => $log->notes,
-                                                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                            </details>
+                                            <p class="activity-details">Duration: {{ $log->duration_seconds }} sec @if ($log->ended_at) • Ended {{ $log->ended_at->format('h:i A') }} @endif @if ($log->notes) • {{ $log->notes }} @endif</p>
+                                            <details class="tech-details"><summary>Technical details</summary><pre class="tech-pre">{{ json_encode(['trigger_type' => $log->trigger_type, 'duration_seconds' => $log->duration_seconds, 'status' => $log->status, 'started_at' => $log->started_at?->format('Y-m-d H:i:s'), 'ended_at' => $log->ended_at?->format('Y-m-d H:i:s'), 'created_at' => $log->created_at?->format('Y-m-d H:i:s'), 'notes' => $log->notes], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre></details>
                                         </div>
                                     </article>
                                 @empty
-                                    <div class="empty-state">
-                                        <h2>No watering activity found</h2>
-                                        <p>Watering logs matching this filter will appear here.</p>
-                                    </div>
+                                    <div class="empty-state"><h2>No watering activity found</h2><p>Watering logs matching this filter will appear here.</p></div>
                                 @endforelse
                             </div>
                         </section>
-
-                        @if ($isPaginator($wateringLogs))
-                            <div class="pagination-wrap">{{ $wateringLogs->links() }}</div>
-                        @endif
                     @endif
 
                     @if (in_array($filter, ['all', 'actions', 'errors'], true))
@@ -461,7 +390,6 @@
                                         $status = strtolower((string) $command->status);
                                         $isError = in_array($status, ['failed', 'expired', 'cancelled'], true);
                                     @endphp
-
                                     <article class="activity-card">
                                         <div class="activity-icon">{{ $isError ? '⚠️' : ($command->command_type === 'scene_apply' ? '🎬' : '⚙️') }}</div>
                                         <div>
@@ -471,32 +399,14 @@
                                             </div>
                                             <p class="activity-time">{{ $formatTime($command->issued_at ?? $command->created_at) }}</p>
                                             <p class="activity-details">{{ $commandDetails($command) }}</p>
-
-                                            <details class="tech-details">
-                                                <summary>Technical details</summary>
-                                                <pre class="tech-pre">{{ json_encode([
-                                                    'command_type' => $command->command_type,
-                                                    'status' => $command->status,
-                                                    'payload' => $command->payload,
-                                                    'issued_at' => $command->issued_at?->format('Y-m-d H:i:s'),
-                                                    'acknowledged_at' => $command->acknowledged_at?->format('Y-m-d H:i:s'),
-                                                    'executed_at' => $command->executed_at?->format('Y-m-d H:i:s'),
-                                                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                            </details>
+                                            <details class="tech-details"><summary>Technical details</summary><pre class="tech-pre">{{ json_encode(['command_type' => $command->command_type, 'status' => $command->status, 'payload' => $command->payload, 'issued_at' => $command->issued_at?->format('Y-m-d H:i:s'), 'acknowledged_at' => $command->acknowledged_at?->format('Y-m-d H:i:s'), 'executed_at' => $command->executed_at?->format('Y-m-d H:i:s')], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre></details>
                                         </div>
                                     </article>
                                 @empty
-                                    <div class="empty-state">
-                                        <h2>No device actions found</h2>
-                                        <p>Commands matching this filter will appear here.</p>
-                                    </div>
+                                    <div class="empty-state"><h2>No device actions found</h2><p>Commands matching this filter will appear here.</p></div>
                                 @endforelse
                             </div>
                         </section>
-
-                        @if ($isPaginator($deviceCommands))
-                            <div class="pagination-wrap">{{ $deviceCommands->links() }}</div>
-                        @endif
                     @endif
                 </div>
             </div>
