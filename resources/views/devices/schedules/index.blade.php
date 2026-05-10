@@ -327,7 +327,7 @@
             <div class="app-screen">
                 <div class="app-content">
                     <section class="hero">
-                        <p class="eyebrow">Plant Bed</p>
+                        <p class="eyebrow">Smart Plant Bed</p>
                         <h1 class="title">Schedule Watering</h1>
                         <!-- <p class="subtitle">Automated watering times for {{ $device->name }}. Timezone: {{ $device->timezone ?? 'Asia/Dhaka' }}.</p> -->
                     </section>

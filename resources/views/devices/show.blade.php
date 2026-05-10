@@ -591,329 +591,348 @@
 
 <body>
     @php
-        $soilValue = is_null($latestReading?->soil_moisture) ? null : max(0, min(100, (int) $latestReading->soil_moisture));
-        $gaugePercent = $soilValue ?? 0;
-        $soilStatus = is_null($soilValue)
-            ? 'No reading yet'
-            : ($soilValue < 35 ? 'Dry' : ($soilValue > 85 ? 'Wet' : 'Optimal'));
+    $soilValue = is_null($latestReading?->soil_moisture) ? null : max(0, min(100, (int) $latestReading->soil_moisture));
+    $gaugePercent = $soilValue ?? 0;
+    $soilStatus = is_null($soilValue)
+    ? 'No reading yet'
+    : ($soilValue < 35 ? 'Dry' : ($soilValue> 85 ? 'Wet' : 'Optimal'));
         $soilStatusKey = $soilStatus === 'Dry' ? 'dry' : ($soilStatus === 'Wet' ? 'wet' : 'optimal');
         $manualStateLabel = ucfirst($manualWateringState);
-    @endphp
+        @endphp
 
-    <div class="page-shell">
-        <a href="{{ route('devices.index') }}" class="back-link">← Back to Devices</a>
+        <div class="page-shell">
+            <a href="{{ route('devices.index') }}" class="back-link">← Back to Devices</a>
 
-        <nav class="tabs">
-            <a href="{{ route('devices.show', $device) }}" class="tab active">Home</a>
-            <a href="{{ route('devices.automation', $device) }}" class="tab">Automation</a>
-            <a href="{{ route('devices.schedules.index', $device) }}" class="tab">Schedules</a>
-            <a href="{{ route('devices.history', $device) }}" class="tab">History</a>
-        </nav>
+            <nav class="tabs">
+                <a href="{{ route('devices.show', $device) }}" class="tab active">Home</a>
+                <a href="{{ route('devices.automation', $device) }}" class="tab">Automation</a>
+                <a href="{{ route('devices.schedules.index', $device) }}" class="tab">Schedules</a>
+                <a href="{{ route('devices.history', $device) }}" class="tab">History</a>
+            </nav>
 
-        @if (session('success'))
+            @if (session('success'))
             <div id="flash-success" class="notice success">{{ session('success') }}</div>
-        @endif
+            @endif
 
-        @if ($errors->any())
+            @if ($errors->any())
             <div class="notice error">
                 <ul>
                     @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
+                    <li>{{ $error }}</li>
                     @endforeach
                 </ul>
             </div>
-        @endif
+            @endif
 
-        <main class="phone-frame">
-            <div class="app-screen">
-                <div class="app-content">
-                    <header class="hero">
-                        <div>
-                            <h1 id="device-name" class="title">{{ $device->name }}</h1>
-                            <p class="subtitle">
-                                <span id="device-location">{{ $device->location_label ?? 'N/A' }}</span>
-                            </p>
-                        </div>
-
-                        <div class="status-box">
-                            <p class="status-box-label">Status</p>
-                            <div id="online-badge" class="status-pill {{ $isOnline ? '' : 'offline' }}">
-                                <span>{{ $isOnline ? 'Live' : 'Offline' }}</span>
-                                <span class="status-dot"></span>
+            <main class="phone-frame">
+                <div class="app-screen">
+                    <div class="app-content">
+                        <header class="hero">
+                            <div>
+                                <h1 id="device-name" class="title">{{ $device->name }}</h1>
+                                <p class="subtitle">
+                                    <span id="device-location">{{ $device->location_label ?? 'N/A' }}</span>
+                                </p>
                             </div>
-                        </div>
-                    </header>
 
-                    <section class="glass-card moisture-card">
-                        <h2 class="card-heading">Soil Moisture</h2>
-
-                        <div class="gauge-wrap">
-                            <svg class="gauge-svg" viewBox="0 0 160 160" aria-hidden="true">
-                                <circle class="gauge-bg" cx="80" cy="80" r="70"></circle>
-                                <circle id="soil-gauge-progress" class="gauge-progress" cx="80" cy="80" r="70" data-radius="70"></circle>
-                            </svg>
-
-                            <div class="gauge-center">
-                                <div class="gauge-value"><span id="reading-soil">{{ $soilValue ?? 'N/A' }}</span><span class="percent">%</span></div>
-                                <div class="gauge-label">Soil level</div>
-                            </div>
-                        </div>
-
-                        <div id="soil-status-badge" class="soil-state {{ $soilStatusKey }}">{{ $soilStatus }}</div>
-                    </section>
-
-                    <section class="metric-grid">
-                        <div class="glass-card metric-card">
-                            <div class="metric-label"><span class="metric-icon">°C</span> Air Temp</div>
-                            <div class="metric-value"><span id="reading-temperature">{{ $latestReading?->temperature ?? 'N/A' }}</span>°C</div>
-                        </div>
-
-                        <div class="glass-card metric-card">
-                            <div class="metric-label"><span class="metric-icon">%</span> Humidity</div>
-                            <div class="metric-value"><span id="reading-humidity">{{ $latestReading?->humidity ?? 'N/A' }}</span>%</div>
-                        </div>
-                    </section>
-
-                    <section>
-                        <h2 class="section-title">Control Center</h2>
-
-                        <div class="control-card">
-                            <div class="control-head">
-                                <div>
-                                    <h3 class="control-title">Pump Control</h3>
-                                    <p class="control-subtitle">State: <span id="manual-state-text">{{ $manualStateLabel }}</span></p>
+                            <div class="status-box">
+                                <p class="status-box-label">Status</p>
+                                <div id="online-badge" class="status-pill {{ $isOnline ? '' : 'offline' }}">
+                                    <span>{{ $isOnline ? 'Live' : 'Offline' }}</span>
+                                    <span class="status-dot"></span>
                                 </div>
+                            </div>
+                        </header>
 
-                                <div id="manual-state-badge" class="manual-pill">{{ $manualStateLabel }}</div>
+                        <section class="glass-card moisture-card">
+                            <h2 class="card-heading">Soil Moisture</h2>
+
+                            <div class="gauge-wrap">
+                                <svg class="gauge-svg" viewBox="0 0 160 160" aria-hidden="true">
+                                    <circle class="gauge-bg" cx="80" cy="80" r="70"></circle>
+                                    <circle id="soil-gauge-progress" class="gauge-progress" cx="80" cy="80" r="70" data-radius="70"></circle>
+                                </svg>
+
+                                <div class="gauge-center">
+                                    <div class="gauge-value"><span id="reading-soil">{{ $soilValue ?? 'N/A' }}</span><span class="percent">%</span></div>
+                                    <div class="gauge-label">Soil level</div>
+                                </div>
                             </div>
 
-                            <div id="started-by-row" class="{{ in_array($manualWateringState, ['waiting', 'watering', 'stopping'], true) ? '' : 'hidden' }} control-subtitle">
-                                Started By: <span id="started-by-text">N/A</span>
+                            <div id="soil-status-badge" class="soil-state {{ $soilStatusKey }}">{{ $soilStatus }}</div>
+                        </section>
+
+                        <section class="metric-grid">
+                            <div class="glass-card metric-card">
+                                <div class="metric-label"><span class="metric-icon">°C</span> Air Temp</div>
+                                <div class="metric-value"><span id="reading-temperature">{{ $latestReading?->temperature ?? 'N/A' }}</span>°C</div>
                             </div>
 
-                            <div id="manual-offline-note" class="{{ $isOnline ? 'hidden' : '' }} offline-note">
-                                Device is offline. Manual watering is unavailable right now.
+                            <div class="glass-card metric-card">
+                                <div class="metric-label"><span class="metric-icon">%</span> Humidity</div>
+                                <div class="metric-value"><span id="reading-humidity">{{ $latestReading?->humidity ?? 'N/A' }}</span>%</div>
                             </div>
+                        </section>
 
-                            <div id="start-form-wrapper" class="{{ $manualWateringState === 'idle' && $isOnline ? '' : 'hidden' }}">
-                                <form action="{{ route('devices.water-now', $device) }}" method="POST">
-                                    @csrf
-                                    <div class="form-row">
-                                        <label for="duration_seconds" class="form-label">Duration (seconds)</label>
-                                        <input
-                                            type="number"
-                                            name="duration_seconds"
-                                            id="duration_seconds"
-                                            min="1"
-                                            max="{{ $manualMaxDuration }}"
-                                            value="{{ old('duration_seconds', min(30, $manualMaxDuration)) }}"
-                                            class="duration-input"
-                                            required>
-                                        <p class="hint-text">Maximum allowed: <span id="manual-max-duration">{{ $manualMaxDuration }}</span> seconds</p>
+                        <section>
+                            <h2 class="section-title">Control Center</h2>
+
+                            <div class="control-card">
+                                <div class="control-head">
+                                    <div>
+                                        <h3 class="control-title">Pump Control</h3>
+                                        <p class="control-subtitle">State: <span id="manual-state-text">{{ $manualStateLabel }}</span></p>
                                     </div>
 
-                                    <button type="submit" class="action-button">Start Manual Watering</button>
-                                </form>
-                            </div>
+                                    <div id="manual-state-badge" class="manual-pill">{{ $manualStateLabel }}</div>
+                                </div>
 
-                            <div id="stop-form-wrapper" class="{{ in_array($manualWateringState, ['waiting', 'watering'], true) && $isOnline ? '' : 'hidden' }}">
-                                <form action="{{ route('devices.water-stop', $device) }}" method="POST">
-                                    @csrf
-                                    <button type="submit" class="action-button danger">Stop Watering</button>
-                                </form>
-                            </div>
+                                <div id="started-by-row" class="{{ in_array($manualWateringState, ['waiting', 'watering', 'stopping'], true) ? '' : 'hidden' }} control-subtitle">
+                                    Started By: <span id="started-by-text">N/A</span>
+                                </div>
 
-                            <div class="mode-chips" style="margin-top: 14px;">
+                                <div id="manual-offline-note" class="{{ $isOnline ? 'hidden' : '' }} offline-note">
+                                    Device is offline. Manual watering is unavailable right now.
+                                </div>
+
+                                <div id="start-form-wrapper" class="{{ $manualWateringState === 'idle' && $isOnline ? '' : 'hidden' }}">
+                                    <form action="{{ route('devices.water-now', $device) }}" method="POST">
+                                        @csrf
+                                        <div class="form-row">
+                                            <label for="duration_seconds" class="form-label">Duration (seconds)</label>
+                                            <input
+                                                type="number"
+                                                name="duration_seconds"
+                                                id="duration_seconds"
+                                                min="1"
+                                                max="{{ $manualMaxDuration }}"
+                                                value="{{ old('duration_seconds', min(30, $manualMaxDuration)) }}"
+                                                class="duration-input"
+                                                required>
+                                            <p class="hint-text">Maximum allowed: <span id="manual-max-duration">{{ $manualMaxDuration }}</span> seconds</p>
+                                        </div>
+
+                                        <button type="submit" class="action-button">Start Manual Watering</button>
+                                    </form>
+                                </div>
+
+                                <div id="stop-form-wrapper" class="{{ in_array($manualWateringState, ['waiting', 'watering'], true) && $isOnline ? '' : 'hidden' }}">
+                                    <form action="{{ route('devices.water-stop', $device) }}" method="POST">
+                                        @csrf
+                                        <button type="submit" class="action-button danger">Stop Watering</button>
+                                    </form>
+                                </div>
+
+                                <!-- <div class="mode-chips" style="margin-top: 14px;">
                                 <div class="mode-chip active">Manual</div>
                                 <div class="mode-chip">Scheduled</div>
+                            </div> -->
                             </div>
-                        </div>
-                    </section>
+                        </section>
 
-                    <section class="device-strip">
-                        <div class="strip-card">
-                            <p class="strip-label">Mode</p>
-                            <p id="device-mode" class="strip-value">{{ ucfirst($device->wateringRule?->watering_mode ?? 'schedule') }}</p>
-                        </div>
+                        <section class="device-strip">
+                            <div class="strip-card">
+                                <p class="strip-label">Mode</p>
+                                <p id="device-mode" class="strip-value">{{ ucfirst($device->wateringRule?->watering_mode ?? 'schedule') }}</p>
+                            </div>
 
-                        <div class="strip-card">
-                            <p class="strip-label">Schedules</p>
-                            <p id="enabled-schedules" class="strip-value">{{ $enabledScheduleCount }} enabled</p>
-                        </div>
+                            <div class="strip-card">
+                                <p class="strip-label">Schedules</p>
+                                <p id="enabled-schedules" class="strip-value">{{ $enabledScheduleCount }} enabled</p>
+                            </div>
 
-                        <div class="strip-card">
-                            <p class="strip-label">Connection</p>
-                            <p id="device-status" class="strip-value">{{ $isOnline ? 'Online' : 'Offline' }}</p>
-                        </div>
+                            <div class="strip-card">
+                                <p class="strip-label">Connection</p>
+                                <p id="device-status" class="strip-value">{{ $isOnline ? 'Online' : 'Offline' }}</p>
+                            </div>
 
-                        <div class="strip-card">
-                            <p class="strip-label">Timezone</p>
-                            <p id="device-timezone" class="strip-value">{{ $device->timezone ?? 'Asia/Dhaka' }}</p>
-                        </div>
-                    </section>
+                            <div class="strip-card">
+                                <p class="strip-label">Timezone</p>
+                                <p id="device-timezone" class="strip-value">{{ $device->timezone ?? 'Asia/Dhaka' }}</p>
+                            </div>
+                        </section>
 
-                    <section class="quick-links">
-                        <a href="{{ route('devices.automation', $device) }}" class="quick-link">
-                            <strong>Automation</strong>
-                            <span>Mode, threshold, cooldown, and durations.</span>
-                        </a>
+                        <section class="quick-links">
+                            <a href="{{ route('devices.automation', $device) }}" class="quick-link">
+                                <strong>Automation</strong>
+                                <span>Mode, threshold, cooldown, and durations.</span>
+                            </a>
 
-                        <a href="{{ route('devices.schedules.index', $device) }}" class="quick-link">
-                            <strong>Schedules</strong>
-                            <span>Manage scheduled watering times.</span>
-                        </a>
+                            <a href="{{ route('devices.schedules.index', $device) }}" class="quick-link">
+                                <strong>Schedules</strong>
+                                <span>Manage scheduled watering times.</span>
+                            </a>
 
-                        <a href="{{ route('devices.history', $device) }}" class="quick-link">
-                            <strong>History</strong>
-                            <span>Recent logs and device commands.</span>
-                        </a>
-                    </section>
+                            <a href="{{ route('devices.history', $device) }}" class="quick-link">
+                                <strong>History</strong>
+                                <span>Recent logs and device commands.</span>
+                            </a>
+                        </section>
 
-                    <p class="last-sync">Last synced: <span id="device-last-seen">{{ $device->last_seen_at?->diffForHumans() ?? 'Never' }}</span></p>
-                    <span id="device-type" class="hidden">{{ $device->displayType() }}</span>
-                    <span id="reading-recorded" class="hidden">{{ $latestReading?->recorded_at?->format('Y-m-d H:i:s') ?? 'N/A' }}</span>
+                        <p class="last-sync">Last synced: <span id="device-last-seen">{{ $device->last_seen_at?->diffForHumans() ?? 'Never' }}</span></p>
+                        <span id="device-type" class="hidden">{{ $device->displayType() }}</span>
+                        <span id="reading-recorded" class="hidden">{{ $latestReading?->recorded_at?->format('Y-m-d H:i:s') ?? 'N/A' }}</span>
+                    </div>
                 </div>
-            </div>
-        </main>
-    </div>
+            </main>
+        </div>
 
-    <script>
-        const statusUrl = "{{ route('devices.status', $device) }}";
+        <script>
+            const statusUrl = "{{ route('devices.status', $device) }}";
 
-        function setText(id, value) {
-            const el = document.getElementById(id);
-            if (!el) return;
-            el.textContent = value ?? 'N/A';
-        }
-
-        function soilStatus(value) {
-            if (value === null || value === undefined || value === 'N/A') return { label: 'No reading yet', key: 'optimal' };
-            const number = Number(value);
-            if (!Number.isFinite(number)) return { label: 'No reading yet', key: 'optimal' };
-            if (number < 35) return { label: 'Dry', key: 'dry' };
-            if (number > 85) return { label: 'Wet', key: 'wet' };
-            return { label: 'Optimal', key: 'optimal' };
-        }
-
-        function updateSoilGauge(value) {
-            const progress = document.getElementById('soil-gauge-progress');
-            const badge = document.getElementById('soil-status-badge');
-            const number = Number(value);
-            const percent = Number.isFinite(number) ? Math.max(0, Math.min(100, number)) : 0;
-
-            if (progress) {
-                const radius = Number(progress.dataset.radius || 70);
-                const circumference = 2 * Math.PI * radius;
-                progress.style.strokeDasharray = `${circumference}`;
-                progress.style.strokeDashoffset = `${circumference - (percent / 100) * circumference}`;
+            function setText(id, value) {
+                const el = document.getElementById(id);
+                if (!el) return;
+                el.textContent = value ?? 'N/A';
             }
 
-            if (badge) {
-                const status = soilStatus(value);
-                badge.textContent = status.label;
-                badge.className = `soil-state ${status.key}`;
+            function soilStatus(value) {
+                if (value === null || value === undefined || value === 'N/A') return {
+                    label: 'No reading yet',
+                    key: 'optimal'
+                };
+                const number = Number(value);
+                if (!Number.isFinite(number)) return {
+                    label: 'No reading yet',
+                    key: 'optimal'
+                };
+                if (number < 35) return {
+                    label: 'Dry',
+                    key: 'dry'
+                };
+                if (number > 85) return {
+                    label: 'Wet',
+                    key: 'wet'
+                };
+                return {
+                    label: 'Optimal',
+                    key: 'optimal'
+                };
             }
-        }
 
-        function manualLabel(state) {
-            if (state === 'waiting') return 'Waiting';
-            if (state === 'watering') return 'Watering';
-            if (state === 'stopping') return 'Stopping';
-            return 'Idle';
-        }
+            function updateSoilGauge(value) {
+                const progress = document.getElementById('soil-gauge-progress');
+                const badge = document.getElementById('soil-status-badge');
+                const number = Number(value);
+                const percent = Number.isFinite(number) ? Math.max(0, Math.min(100, number)) : 0;
 
-        function updateManualState(data) {
-            const state = data.manual.state;
-            const isOnline = data.device.is_online;
-            const label = manualLabel(state);
+                if (progress) {
+                    const radius = Number(progress.dataset.radius || 70);
+                    const circumference = 2 * Math.PI * radius;
+                    progress.style.strokeDasharray = `${circumference}`;
+                    progress.style.strokeDashoffset = `${circumference - (percent / 100) * circumference}`;
+                }
 
-            const stateText = document.getElementById('manual-state-text');
-            const stateBadge = document.getElementById('manual-state-badge');
-            const startWrapper = document.getElementById('start-form-wrapper');
-            const stopWrapper = document.getElementById('stop-form-wrapper');
-            const offlineNote = document.getElementById('manual-offline-note');
-            const startedByRow = document.getElementById('started-by-row');
-            const startedByText = document.getElementById('started-by-text');
-
-            if (stateText) stateText.textContent = label;
-            if (stateBadge) stateBadge.textContent = label;
-
-            if (startedByRow && startedByText) {
-                if (['waiting', 'watering', 'stopping'].includes(state) && data.active_log?.trigger_label) {
-                    startedByText.textContent = data.active_log.trigger_label;
-                    startedByRow.classList.remove('hidden');
-                } else {
-                    startedByText.textContent = 'N/A';
-                    startedByRow.classList.add('hidden');
+                if (badge) {
+                    const status = soilStatus(value);
+                    badge.textContent = status.label;
+                    badge.className = `soil-state ${status.key}`;
                 }
             }
 
-            if (offlineNote) {
-                offlineNote.classList.toggle('hidden', isOnline);
+            function manualLabel(state) {
+                if (state === 'waiting') return 'Waiting';
+                if (state === 'watering') return 'Watering';
+                if (state === 'stopping') return 'Stopping';
+                return 'Idle';
             }
 
-            startWrapper?.classList.toggle('hidden', !(state === 'idle' && isOnline));
-            stopWrapper?.classList.toggle('hidden', !(['waiting', 'watering'].includes(state) && isOnline));
-        }
+            function updateManualState(data) {
+                const state = data.manual.state;
+                const isOnline = data.device.is_online;
+                const label = manualLabel(state);
 
-        function updateOnlineBadge(isOnline) {
-            const badge = document.getElementById('online-badge');
-            if (!badge) return;
+                const stateText = document.getElementById('manual-state-text');
+                const stateBadge = document.getElementById('manual-state-badge');
+                const startWrapper = document.getElementById('start-form-wrapper');
+                const stopWrapper = document.getElementById('stop-form-wrapper');
+                const offlineNote = document.getElementById('manual-offline-note');
+                const startedByRow = document.getElementById('started-by-row');
+                const startedByText = document.getElementById('started-by-text');
 
-            badge.className = isOnline ? 'status-pill' : 'status-pill offline';
-            badge.innerHTML = `<span>${isOnline ? 'Live' : 'Offline'}</span><span class="status-dot"></span>`;
-        }
+                if (stateText) stateText.textContent = label;
+                if (stateBadge) stateBadge.textContent = label;
 
-        async function refreshDeviceStatus() {
-            try {
-                const response = await fetch(statusUrl, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
-                    credentials: 'same-origin',
-                });
-
-                if (!response.ok) {
-                    return;
+                if (startedByRow && startedByText) {
+                    if (['waiting', 'watering', 'stopping'].includes(state) && data.active_log?.trigger_label) {
+                        startedByText.textContent = data.active_log.trigger_label;
+                        startedByRow.classList.remove('hidden');
+                    } else {
+                        startedByText.textContent = 'N/A';
+                        startedByRow.classList.add('hidden');
+                    }
                 }
 
-                const data = await response.json();
+                if (offlineNote) {
+                    offlineNote.classList.toggle('hidden', isOnline);
+                }
 
-                setText('device-name', data.device.name);
-                setText('device-status', data.device.is_online ? 'Online' : 'Offline');
-                setText('device-type', data.device.display_type);
-                setText('device-location', data.device.location_label);
-                setText('device-timezone', data.device.timezone);
-                setText('device-mode', data.device.mode_label);
-                setText('enabled-schedules', `${data.device.enabled_schedule_count} enabled`);
-                setText('device-last-seen', data.device.last_seen_human);
-
-                const soilValue = data.latest_reading.soil_moisture ?? 'N/A';
-                setText('reading-temperature', data.latest_reading.temperature ?? 'N/A');
-                setText('reading-humidity', data.latest_reading.humidity ?? 'N/A');
-                setText('reading-soil', soilValue);
-                setText('reading-recorded', data.latest_reading.recorded_at ?? 'N/A');
-                setText('manual-max-duration', data.manual.max_duration);
-                updateSoilGauge(soilValue);
-                updateOnlineBadge(Boolean(data.device.is_online));
-                updateManualState(data);
-            } catch (error) {
-                console.error('Status refresh failed:', error);
+                startWrapper?.classList.toggle('hidden', !(state === 'idle' && isOnline));
+                stopWrapper?.classList.toggle('hidden', !(['waiting', 'watering'].includes(state) && isOnline));
             }
-        }
 
-        updateSoilGauge({{ is_null($soilValue) ? 'null' : $soilValue }});
-        refreshDeviceStatus();
-        setInterval(refreshDeviceStatus, 5000);
+            function updateOnlineBadge(isOnline) {
+                const badge = document.getElementById('online-badge');
+                if (!badge) return;
 
-        const flashSuccess = document.getElementById('flash-success');
-        if (flashSuccess) {
-            setTimeout(() => {
-                flashSuccess.remove();
-            }, 5000);
-        }
-    </script>
+                badge.className = isOnline ? 'status-pill' : 'status-pill offline';
+                badge.innerHTML = `<span>${isOnline ? 'Live' : 'Offline'}</span><span class="status-dot"></span>`;
+            }
+
+            async function refreshDeviceStatus() {
+                try {
+                    const response = await fetch(statusUrl, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                        },
+                        credentials: 'same-origin',
+                    });
+
+                    if (!response.ok) {
+                        return;
+                    }
+
+                    const data = await response.json();
+
+                    setText('device-name', data.device.name);
+                    setText('device-status', data.device.is_online ? 'Online' : 'Offline');
+                    setText('device-type', data.device.display_type);
+                    setText('device-location', data.device.location_label);
+                    setText('device-timezone', data.device.timezone);
+                    setText('device-mode', data.device.mode_label);
+                    setText('enabled-schedules', `${data.device.enabled_schedule_count} enabled`);
+                    setText('device-last-seen', data.device.last_seen_human);
+
+                    const soilValue = data.latest_reading.soil_moisture ?? 'N/A';
+                    setText('reading-temperature', data.latest_reading.temperature ?? 'N/A');
+                    setText('reading-humidity', data.latest_reading.humidity ?? 'N/A');
+                    setText('reading-soil', soilValue);
+                    setText('reading-recorded', data.latest_reading.recorded_at ?? 'N/A');
+                    setText('manual-max-duration', data.manual.max_duration);
+                    updateSoilGauge(soilValue);
+                    updateOnlineBadge(Boolean(data.device.is_online));
+                    updateManualState(data);
+                } catch (error) {
+                    console.error('Status refresh failed:', error);
+                }
+            }
+
+            updateSoilGauge({
+                {
+                    is_null($soilValue) ? 'null' : $soilValue
+                }
+            });
+            refreshDeviceStatus();
+            setInterval(refreshDeviceStatus, 5000);
+
+            const flashSuccess = document.getElementById('flash-success');
+            if (flashSuccess) {
+                setTimeout(() => {
+                    flashSuccess.remove();
+                }, 5000);
+            }
+        </script>
 </body>
 
 </html>
