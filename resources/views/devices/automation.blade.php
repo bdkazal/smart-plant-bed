@@ -17,7 +17,9 @@
             --dark: #020617;
         }
 
-        * { box-sizing: border-box; }
+        * {
+            box-sizing: border-box;
+        }
 
         body {
             margin: 0;
@@ -44,7 +46,9 @@
             text-decoration: none;
         }
 
-        .back-link:hover { text-decoration: underline; }
+        .back-link:hover {
+            text-decoration: underline;
+        }
 
         .tabs {
             display: flex;
@@ -61,12 +65,12 @@
             padding: 0 16px;
             border-radius: 999px;
             border: 1px solid var(--border-soft);
-            background: rgba(255,255,255,.86);
+            background: rgba(255, 255, 255, .86);
             color: var(--text-main);
             font-size: 14px;
             font-weight: 700;
             text-decoration: none;
-            box-shadow: 0 8px 22px rgba(15,23,42,.08);
+            box-shadow: 0 8px 22px rgba(15, 23, 42, .08);
         }
 
         .tab.active {
@@ -80,18 +84,20 @@
             margin: 0 auto;
             padding: 18px;
             border-radius: 42px;
-            background: rgba(255,255,255,.82);
-            box-shadow: 0 30px 70px rgba(15,23,42,.14), inset 0 0 0 1px rgba(255,255,255,.9);
+            background: rgba(255, 255, 255, .82);
+            box-shadow: 0 30px 70px rgba(15, 23, 42, .14), inset 0 0 0 1px rgba(255, 255, 255, .9);
         }
 
         .app-screen {
             overflow: hidden;
             border-radius: 30px;
-            background: linear-gradient(180deg, rgba(255,255,255,.96), rgba(238,243,248,.94));
-            border: 1px solid rgba(226,232,240,.9);
+            background: linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(238, 243, 248, .94));
+            border: 1px solid rgba(226, 232, 240, .9);
         }
 
-        .app-content { padding: 22px 18px 18px; }
+        .app-content {
+            padding: 22px 18px 18px;
+        }
 
         .hero {
             margin-bottom: 16px;
@@ -99,7 +105,7 @@
             border-radius: 24px;
             color: #fff;
             background: linear-gradient(145deg, #132033 0%, #061225 100%);
-            box-shadow: 0 18px 40px rgba(2,6,23,.22);
+            box-shadow: 0 18px 40px rgba(2, 6, 23, .22);
         }
 
         .eyebrow {
@@ -134,15 +140,22 @@
             font-weight: 650;
         }
 
-        .notice.success { background: #dcfce7; color: #166534; }
-        .notice.error { background: #fee2e2; color: #991b1b; }
+        .notice.success {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .notice.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
 
         .card {
             margin-bottom: 14px;
             border-radius: 22px;
-            border: 1px solid rgba(255,255,255,.86);
-            background: rgba(255,255,255,.78);
-            box-shadow: 0 18px 38px rgba(15,23,42,.09), inset 0 1px 0 rgba(255,255,255,.86);
+            border: 1px solid rgba(255, 255, 255, .86);
+            background: rgba(255, 255, 255, .78);
+            box-shadow: 0 18px 38px rgba(15, 23, 42, .09), inset 0 1px 0 rgba(255, 255, 255, .86);
             backdrop-filter: blur(16px);
             padding: 16px;
         }
@@ -166,7 +179,9 @@
             gap: 13px;
         }
 
-        .field { margin-bottom: 13px; }
+        .field {
+            margin-bottom: 13px;
+        }
 
         .label {
             display: block;
@@ -176,12 +191,13 @@
             color: var(--text-main);
         }
 
-        .input, .select {
+        .input,
+        .select {
             width: 100%;
             min-height: 46px;
             border-radius: 15px;
-            border: 1px solid rgba(148,163,184,.45);
-            background: rgba(255,255,255,.92);
+            border: 1px solid rgba(148, 163, 184, .45);
+            background: rgba(255, 255, 255, .92);
             padding: 0 13px;
             color: var(--text-main);
             font-size: 15px;
@@ -189,9 +205,10 @@
             outline: none;
         }
 
-        .input:focus, .select:focus {
+        .input:focus,
+        .select:focus {
             border-color: var(--blue);
-            box-shadow: 0 0 0 4px rgba(22,135,249,.14);
+            box-shadow: 0 0 0 4px rgba(22, 135, 249, .14);
         }
 
         .hint {
@@ -210,8 +227,15 @@
             line-height: 1.35;
         }
 
-        .status-help.good { background: #dcfce7; color: #166534; }
-        .status-help.warn { background: #fef3c7; color: #92400e; }
+        .status-help.good {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-help.warn {
+            background: #fef3c7;
+            color: #92400e;
+        }
 
         .mode-box {
             display: grid;
@@ -222,7 +246,7 @@
 
         .mode-card {
             border-radius: 18px;
-            border: 1px solid rgba(148,163,184,.35);
+            border: 1px solid rgba(148, 163, 184, .35);
             background: #fff;
             padding: 13px;
         }
@@ -251,19 +275,37 @@
             font-weight: 900;
             letter-spacing: .01em;
             text-transform: uppercase;
-            box-shadow: 0 16px 30px rgba(37,99,235,.35);
+            box-shadow: 0 16px 30px rgba(37, 99, 235, .35);
         }
 
         @media (min-width: 640px) {
-            .form-grid.two { grid-template-columns: 1fr 1fr; }
-            .form-grid.three { grid-template-columns: 1fr 1fr 1fr; }
+            .form-grid.two {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .form-grid.three {
+                grid-template-columns: 1fr 1fr 1fr;
+            }
         }
 
         @media (max-width: 420px) {
-            .page-shell { padding-left: 10px; padding-right: 10px; }
-            .phone-frame { padding: 10px; border-radius: 30px; }
-            .app-screen { border-radius: 24px; }
-            .app-content { padding: 18px 14px 16px; }
+            .page-shell {
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+
+            .phone-frame {
+                padding: 10px;
+                border-radius: 30px;
+            }
+
+            .app-screen {
+                border-radius: 24px;
+            }
+
+            .app-content {
+                padding: 18px 14px 16px;
+            }
         }
     </style>
 </head>
@@ -280,17 +322,17 @@
         </nav>
 
         @if (session('success'))
-            <div class="notice success">{{ session('success') }}</div>
+        <div class="notice success">{{ session('success') }}</div>
         @endif
 
         @if ($errors->any())
-            <div class="notice error">
-                <ul>
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            </div>
+        <div class="notice error">
+            <ul>
+                @foreach ($errors->all() as $error)
+                <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
         @endif
 
         <main class="phone-frame">
@@ -299,7 +341,7 @@
                     <section class="hero">
                         <p class="eyebrow">Plant Bed Control</p>
                         <h1 class="title">Automation Settings</h1>
-                        <p class="subtitle">Tune watering behavior for {{ $device->name }}. Schedules use the device timezone.</p>
+                        <!-- <p class="subtitle">Tune watering behavior for {{ $device->name }}. Schedules use the device timezone.</p> -->
                     </section>
 
                     <form action="{{ route('devices.settings.update', $device) }}" method="POST">
@@ -307,7 +349,7 @@
 
                         <section class="card">
                             <h2 class="card-title">Device Identity</h2>
-                            <p class="card-note">Customer-facing name, location, and timezone.</p>
+                            <!-- <p class="card-note">Customer-facing name, location, and timezone.</p> -->
 
                             <div class="form-grid two">
                                 <div class="field">
@@ -325,9 +367,9 @@
                                 <label for="timezone" class="label">Device Timezone</label>
                                 <select name="timezone" id="timezone" class="select" required>
                                     @foreach ($timezoneOptions as $timezone)
-                                        <option value="{{ $timezone }}" @selected(old('timezone', $device->timezone ?? 'Asia/Dhaka') === $timezone)>
-                                            {{ $timezone }}
-                                        </option>
+                                    <option value="{{ $timezone }}" @selected(old('timezone', $device->timezone ?? 'Asia/Dhaka') === $timezone)>
+                                        {{ $timezone }}
+                                    </option>
                                     @endforeach
                                 </select>
                                 <p class="hint">All schedules use this timezone.</p>
@@ -336,7 +378,7 @@
 
                         <section class="card">
                             <h2 class="card-title">Watering Mode</h2>
-                            <p class="card-note">Choose whether watering runs by sensor threshold or saved schedules.</p>
+                            <!-- <p class="card-note">Choose whether watering runs by sensor threshold or saved schedules.</p> -->
 
                             <div class="mode-box">
                                 <div class="mode-card">
@@ -357,9 +399,9 @@
                                 </select>
 
                                 @if ($latestReading && ! is_null($latestReading->soil_moisture))
-                                    <p class="status-help good">Current soil moisture data is available. Auto mode can operate.</p>
+                                <p class="status-help good">Current soil moisture data is available. Auto mode can operate.</p>
                                 @else
-                                    <p class="status-help warn">Current soil moisture data is unavailable. Auto mode needs a valid moisture reading.</p>
+                                <p class="status-help warn">Current soil moisture data is unavailable. Auto mode needs a valid moisture reading.</p>
                                 @endif
                             </div>
 
