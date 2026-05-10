@@ -177,29 +177,56 @@ class DeviceController extends Controller
         ));
     }
 
-    public function history(Device $device): View
+    public function history(Request $request, Device $device): View
     {
         $this->authorizeDevice($device);
 
         $this->cleanupStaleCommands($device);
 
-        $wateringLogs = WateringLog::where('device_id', $device->id)
-            ->latest()
-            ->paginate(5, ['*'], 'logs_page');
+        $filter = $request->query('filter', 'all');
 
-        $deviceCommands = DeviceCommand::where('device_id', $device->id)
-            ->latest()
-            ->paginate(5, ['*'], 'commands_page');
+        if (! in_array($filter, ['all', 'actions', 'readings', 'errors'], true)) {
+            $filter = 'all';
+        }
 
-        $platformReadings = $device->isSmartFountain()
-            ? $device->platformReadings()->latest()->paginate(5, ['*'], 'readings_page')
+        $wateringLogsQuery = WateringLog::where('device_id', $device->id)->latest();
+        $deviceCommandsQuery = DeviceCommand::where('device_id', $device->id)->latest();
+
+        if ($filter === 'errors') {
+            $wateringLogsQuery->whereIn('status', ['failed', 'expired', 'cancelled']);
+            $deviceCommandsQuery->whereIn('status', ['failed', 'expired', 'cancelled']);
+        }
+
+        $wateringLogs = ($filter === 'all' || $filter === 'actions' || $filter === 'errors')
+            ? $wateringLogsQuery->paginate(8, ['*'], 'logs_page')->withQueryString()
+            : collect();
+
+        $deviceCommands = ($filter === 'all' || $filter === 'actions' || $filter === 'errors')
+            ? $deviceCommandsQuery->paginate(8, ['*'], 'commands_page')->withQueryString()
+            : collect();
+
+        $platformReadings = $device->isSmartFountain() && ($filter === 'all' || $filter === 'readings' || $filter === 'errors')
+            ? $device->platformReadings()
+                ->when($filter === 'errors', fn($query) => $query->where('metric', 'water_low')->where('value', 1))
+                ->latest()
+                ->paginate(8, ['*'], 'readings_page')
+                ->withQueryString()
             : null;
+
+        $sensorReadings = ! $device->isSmartFountain() && ($filter === 'all' || $filter === 'readings')
+            ? $device->sensorReadings()
+                ->latest()
+                ->paginate(8, ['*'], 'readings_page')
+                ->withQueryString()
+            : collect();
 
         return view('devices.history', compact(
             'device',
             'wateringLogs',
             'deviceCommands',
-            'platformReadings'
+            'platformReadings',
+            'sensorReadings',
+            'filter'
         ));
     }
 
