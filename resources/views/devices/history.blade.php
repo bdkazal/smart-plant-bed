@@ -14,10 +14,6 @@
             --text-muted: #64748b;
             --border-soft: rgba(148, 163, 184, 0.30);
             --blue: #1687f9;
-            --green: #16a34a;
-            --red: #dc2626;
-            --amber: #d97706;
-            --dark: #020617;
         }
 
         * { box-sizing: border-box; }
@@ -32,6 +28,7 @@
                 linear-gradient(135deg, #f8fbff 0%, var(--page-bg) 52%, #e6edf6 100%);
         }
 
+        .hidden { display: none !important; }
         .page-shell { width: min(100%, 980px); margin: 0 auto; padding: 18px 14px 34px; }
         .back-link { display: inline-block; margin-bottom: 14px; color: #2563eb; font-weight: 650; font-size: 14px; text-decoration: none; }
         .back-link:hover { text-decoration: underline; }
@@ -66,6 +63,10 @@
         .title { margin: 0; font-size: 27px; line-height: 1.08; font-weight: 900; letter-spacing: -.05em; }
         .subtitle { margin: 8px 0 0; color: #cbd5e1; font-size: 14px; line-height: 1.45; }
 
+        .notice { margin-bottom: 14px; border-radius: 16px; padding: 12px 14px; font-size: 14px; font-weight: 650; }
+        .notice.success { background: #dcfce7; color: #166534; }
+        .notice.error { background: #fee2e2; color: #991b1b; }
+
         .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
         .summary-card {
             border-radius: 18px; background: rgba(255,255,255,.78); border: 1px solid rgba(255,255,255,.86);
@@ -77,13 +78,14 @@
         .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
         .filter-chip {
             flex: 0 0 auto; border-radius: 999px; border: 1px solid rgba(148,163,184,.32); background: rgba(255,255,255,.82);
-            padding: 8px 12px; color: var(--text-main); font-size: 13px; font-weight: 850;
+            padding: 8px 12px; color: var(--text-main); font-size: 13px; font-weight: 850; cursor: pointer;
         }
         .filter-chip.active { background: #dbeafe; color: #1d4ed8; border-color: #bfdbfe; }
 
         .section-label { margin: 14px 0 10px; color: var(--text-muted); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
 
         .activity-list { position: relative; display: grid; gap: 12px; }
+        .activity-section.hidden-by-filter { display: none; }
         .activity-card {
             display: grid; grid-template-columns: 42px 1fr; gap: 12px;
             border-radius: 22px; border: 1px solid rgba(255,255,255,.86); background: rgba(255,255,255,.80);
@@ -107,22 +109,19 @@
         .status-default { background: #e5e7eb; color: #475569; }
 
         details.tech-details { margin-top: 10px; }
-        details.tech-details summary {
-            cursor: pointer; color: #2563eb; font-size: 12px; font-weight: 850; list-style: none;
-        }
+        details.tech-details summary { cursor: pointer; color: #2563eb; font-size: 12px; font-weight: 850; list-style: none; }
         details.tech-details summary::-webkit-details-marker { display: none; }
         .tech-pre {
             margin: 9px 0 0; overflow-x: auto; border-radius: 14px; background: #0f172a; color: #dbeafe;
             padding: 12px; font-size: 11px; line-height: 1.45;
         }
 
-        .empty-state {
+        .empty-state, .no-filter-results {
             border-radius: 22px; background: rgba(255,255,255,.78); border: 1px solid rgba(255,255,255,.86);
             padding: 20px; text-align: center; box-shadow: 0 18px 38px rgba(15,23,42,.08);
         }
-        .empty-state h2 { margin: 0 0 6px; font-size: 18px; font-weight: 950; }
-        .empty-state p { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 1.45; }
-
+        .empty-state h2, .no-filter-results h2 { margin: 0 0 6px; font-size: 18px; font-weight: 950; }
+        .empty-state p, .no-filter-results p { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 1.45; }
         .pagination-wrap { margin-top: 14px; }
 
         @media (max-width: 420px) {
@@ -264,7 +263,7 @@
 
         <main class="phone-frame">
             <div class="app-screen">
-                <div class="app-content">
+                <div class="app-content" id="history-app">
                     <section class="hero">
                         <p class="eyebrow">{{ $device->displayType() }}</p>
                         <h1 class="title">Activity History</h1>
@@ -283,152 +282,206 @@
                     </section>
 
                     <section class="filter-row" aria-label="History filters">
-                        <span class="filter-chip active">All</span>
-                        <span class="filter-chip">Actions</span>
-                        <span class="filter-chip">Readings</span>
-                        <span class="filter-chip">Errors</span>
+                        <button type="button" class="filter-chip active" data-history-filter="all">All</button>
+                        <button type="button" class="filter-chip" data-history-filter="actions">Actions</button>
+                        <button type="button" class="filter-chip" data-history-filter="readings">Readings</button>
+                        <button type="button" class="filter-chip" data-history-filter="errors">Errors</button>
                     </section>
+
+                    <div id="no-filter-results" class="no-filter-results hidden">
+                        <h2>No matching activity</h2>
+                        <p>Try another filter to review more device activity.</p>
+                    </div>
 
                     @if ($isSmartFountain)
-                        <p class="section-label">Device Readings</p>
-                        <section class="activity-list">
-                            @forelse($platformReadings as $reading)
-                                @php
-                                    $metricLabel = ucwords(str_replace('_', ' ', $reading->metric));
-                                    $isWaterLow = $reading->metric === 'water_low' && (int) $reading->value === 1;
-                                @endphp
+                        <section class="activity-section" data-history-section="readings">
+                            <p class="section-label">Device Readings</p>
+                            <div class="activity-list">
+                                @forelse($platformReadings as $reading)
+                                    @php
+                                        $metricLabel = ucwords(str_replace('_', ' ', $reading->metric));
+                                        $isWaterLow = $reading->metric === 'water_low' && (int) $reading->value === 1;
+                                    @endphp
 
-                                <article class="activity-card">
-                                    <div class="activity-icon">{{ $isWaterLow ? '⚠️' : '💧' }}</div>
-                                    <div>
-                                        <div class="activity-title-row">
-                                            <h2 class="activity-title">{{ $metricLabel }} updated</h2>
-                                            <span class="status-pill {{ $isWaterLow ? 'status-failed' : 'status-executed' }}">{{ $isWaterLow ? 'Alert' : 'Logged' }}</span>
+                                    <article class="activity-card" data-history-type="readings" data-history-error="{{ $isWaterLow ? '1' : '0' }}">
+                                        <div class="activity-icon">{{ $isWaterLow ? '⚠️' : '💧' }}</div>
+                                        <div>
+                                            <div class="activity-title-row">
+                                                <h2 class="activity-title">{{ $metricLabel }} updated</h2>
+                                                <span class="status-pill {{ $isWaterLow ? 'status-failed' : 'status-executed' }}">{{ $isWaterLow ? 'Alert' : 'Logged' }}</span>
+                                            </div>
+                                            <p class="activity-time">{{ $formatTime($reading->recorded_at) }}</p>
+                                            <p class="activity-details">{{ $metricLabel }}: {{ $reading->value }} {{ $reading->unit }}</p>
+
+                                            <details class="tech-details">
+                                                <summary>Technical details</summary>
+                                                <pre class="tech-pre">{{ json_encode([
+                                                    'metric' => $reading->metric,
+                                                    'value' => $reading->value,
+                                                    'unit' => $reading->unit,
+                                                    'metadata' => $reading->metadata,
+                                                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                            </details>
                                         </div>
-                                        <p class="activity-time">{{ $formatTime($reading->recorded_at) }}</p>
-                                        <p class="activity-details">{{ $metricLabel }}: {{ $reading->value }} {{ $reading->unit }}</p>
-
-                                        <details class="tech-details">
-                                            <summary>Technical details</summary>
-                                            <pre class="tech-pre">{{ json_encode([
-                                                'metric' => $reading->metric,
-                                                'value' => $reading->value,
-                                                'unit' => $reading->unit,
-                                                'metadata' => $reading->metadata,
-                                            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                        </details>
+                                    </article>
+                                @empty
+                                    <div class="empty-state">
+                                        <h2>No readings yet</h2>
+                                        <p>Smart Fountain water level readings will appear here after the device reports state.</p>
                                     </div>
-                                </article>
-                            @empty
-                                <div class="empty-state">
-                                    <h2>No readings yet</h2>
-                                    <p>Smart Fountain water level readings will appear here after the device reports state.</p>
-                                </div>
-                            @endforelse
+                                @endforelse
+                            </div>
                         </section>
 
-                        <div class="pagination-wrap">{{ $platformReadings?->links() }}</div>
+                        <div class="pagination-wrap" data-history-pagination="readings">{{ $platformReadings?->links() }}</div>
                     @else
-                        <p class="section-label">Watering Activity</p>
-                        <section class="activity-list">
-                            @forelse($wateringLogs as $log)
-                                @php
-                                    $trigger = ucfirst(str_replace('_', ' ', $log->trigger_type));
-                                    $status = strtolower((string) $log->status);
-                                    $title = match ($status) {
-                                        'completed', 'finished' => $trigger . ' watering completed',
-                                        'watering', 'running' => $trigger . ' watering running',
-                                        'failed' => $trigger . ' watering failed',
-                                        default => $trigger . ' watering ' . ($log->status ? strtolower($log->status) : 'logged'),
-                                    };
-                                @endphp
+                        <section class="activity-section" data-history-section="readings">
+                            <p class="section-label">Watering Activity</p>
+                            <div class="activity-list">
+                                @forelse($wateringLogs as $log)
+                                    @php
+                                        $trigger = ucfirst(str_replace('_', ' ', $log->trigger_type));
+                                        $status = strtolower((string) $log->status);
+                                        $isError = in_array($status, ['failed', 'expired', 'cancelled'], true);
+                                        $title = match ($status) {
+                                            'completed', 'finished' => $trigger . ' watering completed',
+                                            'watering', 'running' => $trigger . ' watering running',
+                                            'failed' => $trigger . ' watering failed',
+                                            default => $trigger . ' watering ' . ($log->status ? strtolower($log->status) : 'logged'),
+                                        };
+                                    @endphp
 
-                                <article class="activity-card">
-                                    <div class="activity-icon">{{ in_array($status, ['failed', 'expired'], true) ? '⚠️' : '💧' }}</div>
-                                    <div>
-                                        <div class="activity-title-row">
-                                            <h2 class="activity-title">{{ $title }}</h2>
-                                            <span class="status-pill {{ $statusClass($log->status) }}">{{ ucfirst($log->status ?? 'Logged') }}</span>
+                                    <article class="activity-card" data-history-type="readings" data-history-error="{{ $isError ? '1' : '0' }}">
+                                        <div class="activity-icon">{{ $isError ? '⚠️' : '💧' }}</div>
+                                        <div>
+                                            <div class="activity-title-row">
+                                                <h2 class="activity-title">{{ $title }}</h2>
+                                                <span class="status-pill {{ $statusClass($log->status) }}">{{ ucfirst($log->status ?? 'Logged') }}</span>
+                                            </div>
+                                            <p class="activity-time">{{ $formatTime($log->started_at ?? $log->created_at) }}</p>
+                                            <p class="activity-details">
+                                                Duration: {{ $log->duration_seconds }} sec
+                                                @if ($log->ended_at)
+                                                    • Ended {{ $log->ended_at->format('h:i A') }}
+                                                @endif
+                                                @if ($log->notes)
+                                                    • {{ $log->notes }}
+                                                @endif
+                                            </p>
+
+                                            <details class="tech-details">
+                                                <summary>Technical details</summary>
+                                                <pre class="tech-pre">{{ json_encode([
+                                                    'trigger_type' => $log->trigger_type,
+                                                    'duration_seconds' => $log->duration_seconds,
+                                                    'status' => $log->status,
+                                                    'started_at' => $log->started_at?->format('Y-m-d H:i:s'),
+                                                    'ended_at' => $log->ended_at?->format('Y-m-d H:i:s'),
+                                                    'created_at' => $log->created_at?->format('Y-m-d H:i:s'),
+                                                    'notes' => $log->notes,
+                                                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                            </details>
                                         </div>
-                                        <p class="activity-time">{{ $formatTime($log->started_at ?? $log->created_at) }}</p>
-                                        <p class="activity-details">
-                                            Duration: {{ $log->duration_seconds }} sec
-                                            @if ($log->ended_at)
-                                                • Ended {{ $log->ended_at->format('h:i A') }}
-                                            @endif
-                                            @if ($log->notes)
-                                                • {{ $log->notes }}
-                                            @endif
-                                        </p>
-
-                                        <details class="tech-details">
-                                            <summary>Technical details</summary>
-                                            <pre class="tech-pre">{{ json_encode([
-                                                'trigger_type' => $log->trigger_type,
-                                                'duration_seconds' => $log->duration_seconds,
-                                                'status' => $log->status,
-                                                'started_at' => $log->started_at?->format('Y-m-d H:i:s'),
-                                                'ended_at' => $log->ended_at?->format('Y-m-d H:i:s'),
-                                                'created_at' => $log->created_at?->format('Y-m-d H:i:s'),
-                                                'notes' => $log->notes,
-                                            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                        </details>
+                                    </article>
+                                @empty
+                                    <div class="empty-state">
+                                        <h2>No watering activity yet</h2>
+                                        <p>Manual and scheduled watering activity will appear here.</p>
                                     </div>
-                                </article>
-                            @empty
-                                <div class="empty-state">
-                                    <h2>No watering activity yet</h2>
-                                    <p>Manual and scheduled watering activity will appear here.</p>
-                                </div>
-                            @endforelse
+                                @endforelse
+                            </div>
                         </section>
 
-                        <div class="pagination-wrap">{{ $wateringLogs->links() }}</div>
+                        <div class="pagination-wrap" data-history-pagination="readings">{{ $wateringLogs->links() }}</div>
                     @endif
 
-                    <p class="section-label">Device Actions</p>
-                    <section class="activity-list">
-                        @forelse($deviceCommands as $command)
-                            @php
-                                $status = strtolower((string) $command->status);
-                            @endphp
+                    <section class="activity-section" data-history-section="actions">
+                        <p class="section-label">Device Actions</p>
+                        <div class="activity-list">
+                            @forelse($deviceCommands as $command)
+                                @php
+                                    $status = strtolower((string) $command->status);
+                                    $isError = in_array($status, ['failed', 'expired', 'cancelled'], true);
+                                @endphp
 
-                            <article class="activity-card">
-                                <div class="activity-icon">{{ in_array($status, ['failed', 'expired'], true) ? '⚠️' : ($command->command_type === 'scene_apply' ? '🎬' : '⚙️') }}</div>
-                                <div>
-                                    <div class="activity-title-row">
-                                        <h2 class="activity-title">{{ $commandTitle($command) }}</h2>
-                                        <span class="status-pill {{ $statusClass($command->status) }}">{{ ucfirst($command->status ?? 'Pending') }}</span>
+                                <article class="activity-card" data-history-type="actions" data-history-error="{{ $isError ? '1' : '0' }}">
+                                    <div class="activity-icon">{{ $isError ? '⚠️' : ($command->command_type === 'scene_apply' ? '🎬' : '⚙️') }}</div>
+                                    <div>
+                                        <div class="activity-title-row">
+                                            <h2 class="activity-title">{{ $commandTitle($command) }}</h2>
+                                            <span class="status-pill {{ $statusClass($command->status) }}">{{ ucfirst($command->status ?? 'Pending') }}</span>
+                                        </div>
+                                        <p class="activity-time">{{ $formatTime($command->issued_at ?? $command->created_at) }}</p>
+                                        <p class="activity-details">{{ $commandDetails($command) }}</p>
+
+                                        <details class="tech-details">
+                                            <summary>Technical details</summary>
+                                            <pre class="tech-pre">{{ json_encode([
+                                                'command_type' => $command->command_type,
+                                                'status' => $command->status,
+                                                'payload' => $command->payload,
+                                                'issued_at' => $command->issued_at?->format('Y-m-d H:i:s'),
+                                                'acknowledged_at' => $command->acknowledged_at?->format('Y-m-d H:i:s'),
+                                                'executed_at' => $command->executed_at?->format('Y-m-d H:i:s'),
+                                            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                                        </details>
                                     </div>
-                                    <p class="activity-time">{{ $formatTime($command->issued_at ?? $command->created_at) }}</p>
-                                    <p class="activity-details">{{ $commandDetails($command) }}</p>
-
-                                    <details class="tech-details">
-                                        <summary>Technical details</summary>
-                                        <pre class="tech-pre">{{ json_encode([
-                                            'command_type' => $command->command_type,
-                                            'status' => $command->status,
-                                            'payload' => $command->payload,
-                                            'issued_at' => $command->issued_at?->format('Y-m-d H:i:s'),
-                                            'acknowledged_at' => $command->acknowledged_at?->format('Y-m-d H:i:s'),
-                                            'executed_at' => $command->executed_at?->format('Y-m-d H:i:s'),
-                                        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
-                                    </details>
+                                </article>
+                            @empty
+                                <div class="empty-state">
+                                    <h2>No actions yet</h2>
+                                    <p>Commands sent to this device will appear here.</p>
                                 </div>
-                            </article>
-                        @empty
-                            <div class="empty-state">
-                                <h2>No actions yet</h2>
-                                <p>Commands sent to this device will appear here.</p>
-                            </div>
-                        @endforelse
+                            @endforelse
+                        </div>
                     </section>
 
-                    <div class="pagination-wrap">{{ $deviceCommands->links() }}</div>
+                    <div class="pagination-wrap" data-history-pagination="actions">{{ $deviceCommands->links() }}</div>
                 </div>
             </div>
         </main>
     </div>
+
+    <script>
+        document.querySelectorAll('[data-history-filter]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const filter = button.dataset.historyFilter;
+
+                document.querySelectorAll('[data-history-filter]').forEach((chip) => {
+                    chip.classList.toggle('active', chip === button);
+                });
+
+                let visibleCards = 0;
+
+                document.querySelectorAll('.activity-card').forEach((card) => {
+                    const type = card.dataset.historyType;
+                    const isError = card.dataset.historyError === '1';
+                    const shouldShow = filter === 'all'
+                        || filter === type
+                        || (filter === 'errors' && isError);
+
+                    card.classList.toggle('hidden', !shouldShow);
+
+                    if (shouldShow) {
+                        visibleCards += 1;
+                    }
+                });
+
+                document.querySelectorAll('.activity-section').forEach((section) => {
+                    const hasVisibleCard = Array.from(section.querySelectorAll('.activity-card')).some((card) => !card.classList.contains('hidden'));
+                    section.classList.toggle('hidden-by-filter', !hasVisibleCard);
+                });
+
+                document.querySelectorAll('[data-history-pagination]').forEach((pagination) => {
+                    const paginationType = pagination.dataset.historyPagination;
+                    const showPagination = filter === 'all' || filter === paginationType;
+                    pagination.classList.toggle('hidden', !showPagination);
+                });
+
+                document.getElementById('no-filter-results')?.classList.toggle('hidden', visibleCards > 0);
+            });
+        });
+    </script>
 </body>
 
 </html>
