@@ -16,6 +16,52 @@ The original Smart Plant Bed watering system remains the first working product, 
 
 ---
 
+## Customer-facing Dashboard UX
+
+The Plant Bed web dashboard is now being shaped as a mobile/PWA-style customer interface, not a developer/debug admin screen.
+
+Current Plant Bed customer pages use the modern mobile-style layout:
+
+```text
+Home
+Automation
+Schedules
+History
+```
+
+Current History behavior:
+
+```text
+- customer-friendly Recent Activity page
+- filter links for All / Actions / Readings / Errors
+- Plant Bed Readings = real sensor readings from sensor_readings
+- Plant Bed Actions = watering logs + device commands
+- Smart Fountain Readings = generic device_readings
+- Smart Fountain Actions = scene/output/device commands
+- raw JSON remains hidden inside Technical details
+- normal UI shows recent useful records only, not large database totals
+- pagination is intentionally hidden from the customer-facing activity page
+```
+
+Important data-retention note:
+
+```text
+The UI may show only recent records, but the database still stores more records during MVP testing.
+Do not manually delete old readings/logs just because the UI hides them.
+A future pruning command should safely keep a limited number of old records per device.
+```
+
+Recommended future retention policy:
+
+```text
+Keep latest 500–1000 sensor/device readings per device.
+Keep latest 200–500 watering logs per device.
+Keep latest 200–500 device commands per device.
+Run cleanup daily through Laravel Scheduler.
+```
+
+---
+
 ## Critical Platform Rule: Device Status vs Connection Status
 
 Do **not** confuse account/device lifecycle status with live hardware connection status.
@@ -71,6 +117,13 @@ Device dashboard: Offline
 ```
 
 This means the device belongs to the user and is enabled in the account, but the hardware is not currently connected to Laravel.
+
+Plant Bed dashboard note:
+
+```text
+When the device is offline, live sensor cards should show N/A instead of old readings.
+Old readings remain available in History.
+```
 
 ---
 
@@ -225,7 +278,8 @@ output_set / scene_apply commands
 device_outputs
 device_readings
 device_scenes
-Smart Fountain Home / Scenes / History tabs
+device_schedule_ranges
+Smart Fountain Home / Scenes / Schedule / History tabs
 Smart Fountain status endpoint
 ```
 
@@ -241,8 +295,14 @@ Do not replay failed/expired commands when a device reconnects.
 The shared history page is product-aware:
 
 ```text
-Plant Bed: Watering Logs + Device Commands
-Smart Fountain: Device Readings + Device Commands
+Plant Bed:
+- Sensor Readings from sensor_readings
+- Watering Activity from watering_logs
+- Device Actions from device_commands
+
+Smart Fountain:
+- Device Readings from device_readings
+- Device Actions from device_commands
 ```
 
 ---
@@ -498,10 +558,49 @@ Smart Fountain currently has ready tabs:
 ```text
 Home
 Scenes
+Schedule
 History
 ```
 
-Automation and Schedules are intentionally hidden until Smart Fountain-specific schedule-range behavior is designed.
+---
+
+## Smart Fountain Daily Timeline
+
+Smart Fountain now uses a simple V1 daily timeline schedule instead of an advanced automation page.
+
+The customer-facing model is three continuous timeline blocks:
+
+```text
+Day
+Evening
+Night
+```
+
+The three blocks cover the full 24 hours without overlap or gaps:
+
+```text
+Day ends when Evening starts.
+Evening ends when Night starts.
+Night ends when Day starts.
+```
+
+Each block applies one scene at its start time using a `scene_apply` command.
+
+Example:
+
+```text
+06:00 → Day Fountain
+18:00 → Night Glow
+23:00 → All Off
+```
+
+Manual scene apply still works from the Scenes page. It changes the current output state immediately through a `scene_apply` command. It does not permanently edit the daily timeline. The next scheduled timeline block will apply its configured scene at its start time.
+
+Manual testing command:
+
+```bash
+php artisan smart-fountain:check-schedules --day=6 --time=06:00
+```
 
 ---
 
@@ -771,18 +870,19 @@ Smart Fountain history currently uses the shared history page:
 GET /devices/{device}/history
 ```
 
-For Smart Fountain, the shared history page shows:
+For Smart Fountain, the shared history page shows recent customer-facing activity:
 
 ```text
 Device Readings
-Device Commands
+Device Actions
 ```
 
-For Plant Bed, the same history page shows:
+For Plant Bed, the same history page shows recent customer-facing activity:
 
 ```text
-Watering Logs
-Device Commands
+Sensor Readings
+Watering Activity
+Device Actions
 ```
 
 ---
@@ -796,6 +896,7 @@ The Laravel side already includes:
 - user authentication
 - device claiming / ownership flow
 - device dashboard pages
+- modern mobile/PWA-style Plant Bed Home, Automation, Schedules, and History pages
 - sensor reading upload
 - manual watering commands
 - scheduled watering for Plant Bed
@@ -805,14 +906,17 @@ The Laravel side already includes:
 - schedule CRUD for Plant Bed
 - timezone-aware schedules for Plant Bed
 - basic online / offline device presence using `last_seen_at`
+- customer-friendly recent activity history with All / Actions / Readings / Errors filters
 - early IoT platform foundation models/tables:
   - `device_capabilities`
   - `device_outputs`
   - `device_readings`
   - `device_scenes`
+  - `device_schedule_ranges`
   - `devices.last_reported_state`
 - Smart Fountain dashboard using generic `output_set` commands
 - Smart Fountain full-scene presets using `scene_apply` commands
+- Smart Fountain Daily Timeline schedule using scene ranges
 - Smart Fountain platform config API
 - Smart Fountain platform state sync API
 - Smart Fountain dashboard auto-refresh/status endpoint
@@ -857,6 +961,8 @@ stopping
 
 Manual watering is **not** a persistent mode. Manual watering is a direct user action / trigger source.
 
+Plant Bed schedule form duration should follow the Automation max watering duration setting.
+
 ---
 
 ## API Endpoints
@@ -890,9 +996,29 @@ The device identifies itself using:
 
 ## Known Incomplete Areas
 
-### 1. Generic schedule ranges
+### 1. Data pruning / retention command
 
-Plant Bed currently has watering schedules. Persistent state devices need state-range schedules that apply scenes.
+The customer-facing History page shows recent useful records only, but old records are still kept during MVP testing.
+
+Future direction:
+
+```text
+php artisan devices:prune-history
+```
+
+Recommended default policy:
+
+```text
+sensor_readings / device_readings: keep latest 500–1000 rows per device
+watering_logs: keep latest 200–500 rows per device
+device_commands: keep latest 200–500 rows per device
+```
+
+This should be scheduled daily through Laravel Scheduler after the retention policy is finalized.
+
+### 2. Generic schedule range engine
+
+Smart Fountain now has V1 daily timeline schedule ranges. The platform may later need a reusable generic range engine for other persistent state devices.
 
 Future direction:
 
@@ -912,7 +1038,7 @@ Every day 06:00 to 20:00 → Apply Day scene
 After 20:00 → Apply Night/Off scene
 ```
 
-### 2. Desired State vs Reported State
+### 3. Desired State vs Reported State
 
 Do not expose these words to normal users, but the backend may eventually need separate state fields:
 
@@ -923,7 +1049,7 @@ reported_state = what device confirmed as actual hardware state
 
 For V1, the command lifecycle plus `/api/device/state` is enough. Before serious production hardware, consider adding explicit desired/reported state separation if command/state mismatch becomes common.
 
-### 3. Output event history
+### 4. Output event history
 
 Smart Fountain currently stores current output state and command history.
 
@@ -942,7 +1068,7 @@ This may later need:
 device_output_events
 ```
 
-### 4. ESP32 Runtime Design Per Product
+### 5. ESP32 Runtime Design Per Product
 
 The detailed device-side control loop should be designed per product after the Laravel/API contract is stable.
 
@@ -967,6 +1093,7 @@ Not MVP priorities, but possible later:
 - device-to-device automation rules
 - reusable scene engine
 - generic schedule engine
+- history pruning / retention dashboard
 
 ---
 
@@ -1018,3 +1145,5 @@ When opening a new thread for a new device, preserve these platform rules:
 - make API responses device/request-specific; do not return unrelated Plant Bed fields for new devices
 - keep Plant Bed timed watering logic isolated from Smart Fountain persistent-state logic
 - keep existing Plant Bed functionality working while adding platform features
+- keep customer pages simple; hide technical JSON behind expandable details
+- keep large record counts and raw debugging information out of the normal customer UI
