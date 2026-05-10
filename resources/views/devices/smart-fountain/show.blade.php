@@ -152,7 +152,7 @@
             </div>
         @else
             <div class="mt-4 grid gap-4 md:grid-cols-3">
-                <form id="pump-control-form" method="POST" action="{{ route('devices.outputs.set', [$device, 'pump']) }}" class="rounded-lg bg-white p-5 shadow">
+                <form id="pump-control-form" data-output-form="pump" method="POST" action="{{ route('devices.outputs.set', [$device, 'pump']) }}" class="rounded-lg bg-white p-5 shadow">
                     @csrf
                     <div class="mb-4 flex items-start justify-between gap-3">
                         <div>
@@ -166,6 +166,11 @@
 
                     <div id="pump-safety-note" class="{{ $isWaterLow ? '' : 'hidden' }} mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                         Pump controls are disabled while water is low.
+                    </div>
+
+                    <div id="pump-dirty-note" class="hidden mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        Unsaved pump changes.
+                        <button type="button" data-reset-output="pump" class="ml-2 font-semibold text-amber-900 underline">Reset to current</button>
                     </div>
 
                     <div class="mb-4 rounded border border-gray-200 bg-gray-50 px-4 py-3">
@@ -196,7 +201,7 @@
                     </button>
                 </form>
 
-                <form method="POST" action="{{ route('devices.outputs.set', [$device, 'cob_light']) }}" class="rounded-lg bg-white p-5 shadow">
+                <form data-output-form="cob_light" method="POST" action="{{ route('devices.outputs.set', [$device, 'cob_light']) }}" class="rounded-lg bg-white p-5 shadow">
                     @csrf
                     <div class="mb-4 flex items-start justify-between gap-3">
                         <div>
@@ -206,6 +211,11 @@
                         <span id="cob-light-command" class="rounded-full px-2 py-1 text-xs {{ $commandClass($cobLightCommand) }}">
                             {{ $commandLabel($cobLightCommand) }}
                         </span>
+                    </div>
+
+                    <div id="cob-light-dirty-note" class="hidden mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        Unsaved COB light changes.
+                        <button type="button" data-reset-output="cob_light" class="ml-2 font-semibold text-amber-900 underline">Reset to current</button>
                     </div>
 
                     <div class="mb-4 rounded border border-gray-200 bg-gray-50 px-4 py-3">
@@ -235,7 +245,7 @@
                     </button>
                 </form>
 
-                <form method="POST" action="{{ route('devices.outputs.set', [$device, 'rgb_light']) }}" class="rounded-lg bg-white p-5 shadow">
+                <form data-output-form="rgb_light" method="POST" action="{{ route('devices.outputs.set', [$device, 'rgb_light']) }}" class="rounded-lg bg-white p-5 shadow">
                     @csrf
                     <div class="mb-4 flex items-start justify-between gap-3">
                         <div>
@@ -245,6 +255,11 @@
                         <span id="rgb-light-command" class="rounded-full px-2 py-1 text-xs {{ $commandClass($rgbLightCommand) }}">
                             {{ $commandLabel($rgbLightCommand) }}
                         </span>
+                    </div>
+
+                    <div id="rgb-light-dirty-note" class="hidden mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        Unsaved RGB light changes.
+                        <button type="button" data-reset-output="rgb_light" class="ml-2 font-semibold text-amber-900 underline">Reset to current</button>
                     </div>
 
                     <div class="mb-4 rounded border border-gray-200 bg-gray-50 px-4 py-3">
@@ -300,6 +315,8 @@
     <script>
         const smartFountainStatusUrl = "{{ route('devices.smart-fountain.status', $device) }}";
         let isWaterSafetyLocked = {{ $isWaterLow ? 'true' : 'false' }};
+        const dirtyForms = new Set();
+        const latestOutputStates = {};
 
         function setText(id, value) {
             const el = document.getElementById(id);
@@ -307,22 +324,35 @@
             el.textContent = value ?? 'N/A';
         }
 
-        function isUserEditingControl(id) {
+        function setInputValue(id, value, force = false) {
             const el = document.getElementById(id);
-            if (!el) return false;
-            return document.activeElement === el;
-        }
-
-        function setInputValue(id, value) {
-            const el = document.getElementById(id);
-            if (!el || isUserEditingControl(id)) return;
+            if (!el || (!force && document.activeElement === el)) return;
             el.value = value ?? '';
         }
 
-        function setCheckbox(id, checked) {
+        function setCheckbox(id, checked, force = false) {
             const el = document.getElementById(id);
-            if (!el || isUserEditingControl(id)) return;
+            if (!el || (!force && document.activeElement === el)) return;
             el.checked = Boolean(checked);
+        }
+
+        function dirtyNoteId(outputKey) {
+            return `${outputKey.replace(/_/g, '-')}-dirty-note`;
+        }
+
+        function showDirtyNote(outputKey, show) {
+            document.getElementById(dirtyNoteId(outputKey))?.classList.toggle('hidden', !show);
+        }
+
+        function markFormDirty(outputKey) {
+            if (outputKey === 'pump' && isWaterSafetyLocked) return;
+            dirtyForms.add(outputKey);
+            showDirtyNote(outputKey, true);
+        }
+
+        function clearFormDirty(outputKey) {
+            dirtyForms.delete(outputKey);
+            showDirtyNote(outputKey, false);
         }
 
         function commandBadgeClass(status) {
@@ -341,6 +371,31 @@
             el.className = commandBadgeClass(command?.status);
         }
 
+        function applyOutputInputs(outputKey, state, force = false) {
+            if (outputKey === 'pump') {
+                setCheckbox('pump-enabled-input', state.enabled, force);
+                setInputValue('pump_speed_percent', state.speed_percent ?? 0, force);
+            }
+
+            if (outputKey === 'cob_light') {
+                setCheckbox('cob-light-enabled-input', state.enabled, force);
+                setInputValue('cob_brightness_percent', state.brightness_percent ?? 0, force);
+            }
+
+            if (outputKey === 'rgb_light') {
+                setCheckbox('rgb-light-enabled-input', state.enabled, force);
+                setInputValue('rgb_brightness_percent', state.brightness_percent ?? 0, force);
+                setInputValue('rgb_color', state.color ?? '#FFB066', force);
+                setInputValue('rgb_effect', state.effect ?? 'warm_glow', force);
+            }
+        }
+
+        function resetFormToCurrent(outputKey) {
+            const state = latestOutputStates[outputKey] ?? {};
+            clearFormDirty(outputKey);
+            applyOutputInputs(outputKey, state, true);
+        }
+
         function updatePumpSafetyLock(isLocked) {
             isWaterSafetyLocked = Boolean(isLocked);
 
@@ -350,6 +405,10 @@
             const safetyNote = document.getElementById('pump-safety-note');
             const label = document.getElementById('pump-enabled-label');
             const badge = document.getElementById('pump-command');
+
+            if (isWaterSafetyLocked) {
+                clearFormDirty('pump');
+            }
 
             if (checkbox) {
                 checkbox.disabled = isWaterSafetyLocked;
@@ -427,37 +486,65 @@
         function updateOutputCards(outputs) {
             const pump = outputs.pump ?? {};
             const pumpState = pump.state ?? {};
+            latestOutputStates.pump = pumpState;
             setText('pump-state', pumpState.enabled ? 'ON' : 'OFF');
             setText('pump-speed', `${pumpState.speed_percent ?? 0}%`);
             setText('pump-source', pump.last_changed_source ?? 'N/A');
 
             if (!isWaterSafetyLocked) {
                 updateCommandBadge('pump-command', pump.last_command);
-                setCheckbox('pump-enabled-input', pumpState.enabled);
-                setInputValue('pump_speed_percent', pumpState.speed_percent ?? 0);
+                if (!dirtyForms.has('pump')) {
+                    applyOutputInputs('pump', pumpState);
+                }
             }
 
             const cob = outputs.cob_light ?? {};
             const cobState = cob.state ?? {};
+            latestOutputStates.cob_light = cobState;
             setText('cob-light-state', cobState.enabled ? 'ON' : 'OFF');
             setText('cob-light-brightness', `${cobState.brightness_percent ?? 0}%`);
             setText('cob-light-source', cob.last_changed_source ?? 'N/A');
             updateCommandBadge('cob-light-command', cob.last_command);
-            setCheckbox('cob-light-enabled-input', cobState.enabled);
-            setInputValue('cob_brightness_percent', cobState.brightness_percent ?? 0);
+            if (!dirtyForms.has('cob_light')) {
+                applyOutputInputs('cob_light', cobState);
+            }
 
             const rgb = outputs.rgb_light ?? {};
             const rgbState = rgb.state ?? {};
+            latestOutputStates.rgb_light = rgbState;
             setText('rgb-light-state', rgbState.enabled ? 'ON' : 'OFF');
             setText('rgb-light-brightness', `${rgbState.brightness_percent ?? 0}%`);
             setText('rgb-light-color', rgbState.color ?? 'N/A');
             setText('rgb-light-effect', (rgbState.effect ?? 'N/A').replace(/_/g, ' '));
             setText('rgb-light-source', rgb.last_changed_source ?? 'N/A');
             updateCommandBadge('rgb-light-command', rgb.last_command);
-            setCheckbox('rgb-light-enabled-input', rgbState.enabled);
-            setInputValue('rgb_brightness_percent', rgbState.brightness_percent ?? 0);
-            setInputValue('rgb_color', rgbState.color ?? '#FFB066');
-            setInputValue('rgb_effect', rgbState.effect ?? 'warm_glow');
+            if (!dirtyForms.has('rgb_light')) {
+                applyOutputInputs('rgb_light', rgbState);
+            }
+        }
+
+        function initializeDirtyFormTracking() {
+            document.querySelectorAll('[data-output-form]').forEach((form) => {
+                const outputKey = form.dataset.outputForm;
+
+                form.addEventListener('input', (event) => {
+                    if (event.target.closest('[data-reset-output]')) return;
+                    markFormDirty(outputKey);
+                });
+
+                form.addEventListener('change', (event) => {
+                    if (event.target.closest('[data-reset-output]')) return;
+                    markFormDirty(outputKey);
+                });
+
+                form.addEventListener('submit', () => {
+                    clearFormDirty(outputKey);
+                });
+            });
+
+            document.querySelectorAll('[data-reset-output]').forEach((button) => {
+                button.addEventListener('click', () => resetFormToCurrent(button.dataset.resetOutput));
+            });
         }
 
         async function refreshSmartFountainStatus() {
@@ -482,6 +569,7 @@
             }
         }
 
+        initializeDirtyFormTracking();
         refreshSmartFountainStatus();
         setInterval(refreshSmartFountainStatus, 5000);
 
