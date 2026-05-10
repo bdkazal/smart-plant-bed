@@ -54,6 +54,7 @@
             $rgbLight = $outputs->get('rgb_light');
 
             $waterLow = $latestReadings->get('water_low')?->value;
+            $isWaterLow = (int) $waterLow === 1;
             $waterLevel = $latestReadings->get('water_level_percent')?->value;
 
             $latestCommandFor = function (string $outputKey) use ($device) {
@@ -119,10 +120,10 @@
 
                 <p>
                     <strong>Water Low:</strong>
-                    <span id="water-low" class="{{ is_null($waterLow) ? '' : ((int) $waterLow === 1 ? 'font-semibold text-red-600' : 'font-semibold text-green-700') }}">
+                    <span id="water-low" class="{{ is_null($waterLow) ? '' : ($isWaterLow ? 'font-semibold text-red-600' : 'font-semibold text-green-700') }}">
                         @if (is_null($waterLow))
                             N/A
-                        @elseif ((int) $waterLow === 1)
+                        @elseif ($isWaterLow)
                             Yes
                         @else
                             No
@@ -135,8 +136,8 @@
                     <span id="water-level">{{ is_null($waterLevel) ? 'N/A' : number_format($waterLevel, 0) . '%' }}</span>
                 </p>
 
-                <div id="water-low-warning" class="{{ (int) $waterLow === 1 ? '' : 'hidden' }} mt-4 rounded border border-red-300 bg-red-50 px-4 py-3 text-red-700">
-                    Low water detected. Pump should stay OFF to protect the motor.
+                <div id="water-low-warning" class="{{ $isWaterLow ? '' : 'hidden' }} mt-4 rounded border border-red-300 bg-red-50 px-4 py-3 text-red-700">
+                    Low water detected. Pump is locked OFF for safety. Lights can still be used.
                 </div>
             </div>
         </div>
@@ -151,16 +152,20 @@
             </div>
         @else
             <div class="mt-4 grid gap-4 md:grid-cols-3">
-                <form method="POST" action="{{ route('devices.outputs.set', [$device, 'pump']) }}" class="rounded-lg bg-white p-5 shadow">
+                <form id="pump-control-form" method="POST" action="{{ route('devices.outputs.set', [$device, 'pump']) }}" class="rounded-lg bg-white p-5 shadow">
                     @csrf
                     <div class="mb-4 flex items-start justify-between gap-3">
                         <div>
                             <h2 class="text-lg font-semibold">Pump Control</h2>
                             <p class="text-sm text-gray-500">Water pump output</p>
                         </div>
-                        <span id="pump-command" class="rounded-full px-2 py-1 text-xs {{ $commandClass($pumpCommand) }}">
-                            {{ $commandLabel($pumpCommand) }}
+                        <span id="pump-command" class="rounded-full px-2 py-1 text-xs {{ $isWaterLow ? 'bg-red-100 text-red-800' : $commandClass($pumpCommand) }}">
+                            {{ $isWaterLow ? 'Pump Locked' : $commandLabel($pumpCommand) }}
                         </span>
+                    </div>
+
+                    <div id="pump-safety-note" class="{{ $isWaterLow ? '' : 'hidden' }} mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                        Pump controls are disabled while water is low.
                     </div>
 
                     <div class="mb-4 rounded border border-gray-200 bg-gray-50 px-4 py-3">
@@ -169,8 +174,8 @@
                         <p><strong>Source:</strong> <span id="pump-source">{{ $pump?->last_changed_source ?? 'N/A' }}</span></p>
                     </div>
 
-                    <label class="mb-3 flex items-center gap-2">
-                        <input id="pump-enabled-input" type="checkbox" name="enabled" value="1" {{ data_get($pump?->state, 'enabled') ? 'checked' : '' }}>
+                    <label class="mb-3 flex items-center gap-2 {{ $isWaterLow ? 'opacity-60' : '' }}" id="pump-enabled-label">
+                        <input id="pump-enabled-input" type="checkbox" name="enabled" value="1" {{ data_get($pump?->state, 'enabled') ? 'checked' : '' }} {{ $isWaterLow ? 'disabled' : '' }}>
                         <span>Enable pump</span>
                     </label>
 
@@ -182,11 +187,12 @@
                         min="0"
                         max="100"
                         value="{{ old('speed_percent', data_get($pump?->state, 'speed_percent', 0)) }}"
-                        class="mb-3 w-full rounded border px-3 py-2"
+                        class="mb-3 w-full rounded border px-3 py-2 {{ $isWaterLow ? 'bg-gray-100 text-gray-500' : '' }}"
+                        {{ $isWaterLow ? 'disabled' : '' }}
                         required>
 
-                    <button type="submit" class="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
-                        Send Pump Command
+                    <button id="pump-submit-button" type="submit" class="rounded px-4 py-2 text-white {{ $isWaterLow ? 'cursor-not-allowed bg-gray-400' : 'bg-blue-600 hover:bg-blue-700' }}" {{ $isWaterLow ? 'disabled' : '' }}>
+                        {{ $isWaterLow ? 'Pump Locked by Water Safety' : 'Send Pump Command' }}
                     </button>
                 </form>
 
@@ -293,6 +299,7 @@
 
     <script>
         const smartFountainStatusUrl = "{{ route('devices.smart-fountain.status', $device) }}";
+        let isWaterSafetyLocked = {{ $isWaterLow ? 'true' : 'false' }};
 
         function setText(id, value) {
             const el = document.getElementById(id);
@@ -300,15 +307,21 @@
             el.textContent = value ?? 'N/A';
         }
 
+        function isUserEditingControl(id) {
+            const el = document.getElementById(id);
+            if (!el) return false;
+            return document.activeElement === el;
+        }
+
         function setInputValue(id, value) {
             const el = document.getElementById(id);
-            if (!el || document.activeElement === el) return;
+            if (!el || isUserEditingControl(id)) return;
             el.value = value ?? '';
         }
 
         function setCheckbox(id, checked) {
             const el = document.getElementById(id);
-            if (!el || document.activeElement === el) return;
+            if (!el || isUserEditingControl(id)) return;
             el.checked = Boolean(checked);
         }
 
@@ -326,6 +339,45 @@
 
             el.textContent = command?.status_label ?? 'None yet';
             el.className = commandBadgeClass(command?.status);
+        }
+
+        function updatePumpSafetyLock(isLocked) {
+            isWaterSafetyLocked = Boolean(isLocked);
+
+            const checkbox = document.getElementById('pump-enabled-input');
+            const speedInput = document.getElementById('pump_speed_percent');
+            const submitButton = document.getElementById('pump-submit-button');
+            const safetyNote = document.getElementById('pump-safety-note');
+            const label = document.getElementById('pump-enabled-label');
+            const badge = document.getElementById('pump-command');
+
+            if (checkbox) {
+                checkbox.disabled = isWaterSafetyLocked;
+                if (isWaterSafetyLocked) checkbox.checked = false;
+            }
+
+            if (speedInput) {
+                speedInput.disabled = isWaterSafetyLocked;
+                speedInput.classList.toggle('bg-gray-100', isWaterSafetyLocked);
+                speedInput.classList.toggle('text-gray-500', isWaterSafetyLocked);
+                if (isWaterSafetyLocked) speedInput.value = 0;
+            }
+
+            if (submitButton) {
+                submitButton.disabled = isWaterSafetyLocked;
+                submitButton.textContent = isWaterSafetyLocked ? 'Pump Locked by Water Safety' : 'Send Pump Command';
+                submitButton.className = isWaterSafetyLocked
+                    ? 'rounded px-4 py-2 text-white cursor-not-allowed bg-gray-400'
+                    : 'rounded px-4 py-2 text-white bg-blue-600 hover:bg-blue-700';
+            }
+
+            safetyNote?.classList.toggle('hidden', !isWaterSafetyLocked);
+            label?.classList.toggle('opacity-60', isWaterSafetyLocked);
+
+            if (badge && isWaterSafetyLocked) {
+                badge.textContent = 'Pump Locked';
+                badge.className = 'rounded-full px-2 py-1 text-xs bg-red-100 text-red-800';
+            }
         }
 
         function updateOnlineStatus(device) {
@@ -352,12 +404,13 @@
             const waterLow = readings.water_low;
             const waterLevel = readings.water_level_percent;
             const waterLowEl = document.getElementById('water-low');
+            const locked = Number(waterLow) === 1;
 
             if (waterLowEl) {
                 if (waterLow === null || waterLow === undefined) {
                     waterLowEl.textContent = 'N/A';
                     waterLowEl.className = '';
-                } else if (Number(waterLow) === 1) {
+                } else if (locked) {
                     waterLowEl.textContent = 'Yes';
                     waterLowEl.className = 'font-semibold text-red-600';
                 } else {
@@ -367,7 +420,8 @@
             }
 
             setText('water-level', waterLevel === null || waterLevel === undefined ? 'N/A' : `${Number(waterLevel).toFixed(0)}%`);
-            document.getElementById('water-low-warning')?.classList.toggle('hidden', Number(waterLow) !== 1);
+            document.getElementById('water-low-warning')?.classList.toggle('hidden', !locked);
+            updatePumpSafetyLock(locked);
         }
 
         function updateOutputCards(outputs) {
@@ -376,9 +430,12 @@
             setText('pump-state', pumpState.enabled ? 'ON' : 'OFF');
             setText('pump-speed', `${pumpState.speed_percent ?? 0}%`);
             setText('pump-source', pump.last_changed_source ?? 'N/A');
-            updateCommandBadge('pump-command', pump.last_command);
-            setCheckbox('pump-enabled-input', pumpState.enabled);
-            setInputValue('pump_speed_percent', pumpState.speed_percent ?? 0);
+
+            if (!isWaterSafetyLocked) {
+                updateCommandBadge('pump-command', pump.last_command);
+                setCheckbox('pump-enabled-input', pumpState.enabled);
+                setInputValue('pump_speed_percent', pumpState.speed_percent ?? 0);
+            }
 
             const cob = outputs.cob_light ?? {};
             const cobState = cob.state ?? {};
