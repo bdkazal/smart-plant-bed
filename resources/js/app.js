@@ -207,9 +207,69 @@ function polishSmartFountainDashboard() {
     appContent.appendChild(syncText);
 }
 
+function smartFountainScenesStatusUrl() {
+    const path = window.location.pathname.replace(/\/$/, '');
+    const match = path.match(/^\/devices\/(\d+)\/smart-fountain\/scenes$/);
+
+    if (!match) return null;
+
+    return `/devices/${match[1]}/smart-fountain/status`;
+}
+
+function setSmartFountainSceneButtonsOffline(isOffline) {
+    document.querySelectorAll('.apply-btn').forEach((button) => {
+        button.disabled = isOffline;
+        button.textContent = isOffline ? 'Device Offline' : 'Apply Scene';
+    });
+}
+
+function ensureSmartFountainScenesOfflineNotice() {
+    if (document.getElementById('scene-offline-note')) return;
+
+    const appContent = document.querySelector('.app-content');
+    const hero = appContent?.querySelector('.hero');
+    if (!appContent || !hero) return;
+
+    const note = document.createElement('div');
+    note.id = 'scene-offline-note';
+    note.className = 'offline-note';
+    note.textContent = 'Device is offline. Scene apply is disabled until the fountain reconnects.';
+    hero.insertAdjacentElement('afterend', note);
+}
+
+async function refreshSmartFountainScenesPage() {
+    const url = smartFountainScenesStatusUrl();
+    if (!url || !document.querySelector('.apply-btn')) return;
+
+    try {
+        const response = await fetch(url, {
+            headers: {
+                Accept: 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+            },
+            credentials: 'same-origin',
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        const isOffline = !Boolean(data?.device?.is_online);
+
+        if (isOffline) {
+            ensureSmartFountainScenesOfflineNotice();
+        }
+
+        setSmartFountainSceneButtonsOffline(isOffline);
+    } catch (error) {
+        console.error('Smart Fountain scenes status refresh failed:', error);
+    }
+}
+
 window.addEventListener('DOMContentLoaded', () => {
     ensurePlantBedSettingsShortcut();
     refreshPlantBedDashboard();
     setInterval(refreshPlantBedDashboard, 5000);
     polishSmartFountainDashboard();
+    refreshSmartFountainScenesPage();
+    setInterval(refreshSmartFountainScenesPage, 5000);
 });
