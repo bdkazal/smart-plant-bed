@@ -443,6 +443,14 @@ class DeviceController extends Controller
                 ]);
         }
 
+        if (! $this->isDeviceOnline($device)) {
+            return redirect()
+                ->route('devices.show', $device)
+                ->withErrors([
+                    'output' => 'Device is offline. Fountain commands are disabled until the device reconnects.',
+                ]);
+        }
+
         $deviceOutput = $device->outputs()
             ->where('key', $output)
             ->firstOrFail();
