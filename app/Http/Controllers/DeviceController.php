@@ -235,9 +235,6 @@ class DeviceController extends Controller
         $this->authorizeDevice($device);
 
         $validated = $request->validate([
-            'name' => ['required', 'string', 'max:100'],
-            'location_label' => ['nullable', 'string', 'max:100'],
-            'timezone' => ['required', 'timezone'],
             'watering_mode' => ['required', 'in:auto,schedule'],
             'soil_moisture_threshold' => ['required', 'integer', 'min:0', 'max:100'],
             'max_watering_duration_seconds' => ['required', 'integer', 'min:1', 'max:300'],
@@ -259,12 +256,6 @@ class DeviceController extends Controller
             ]);
         }
 
-        $device->update([
-            'name' => $validated['name'],
-            'location_label' => $validated['location_label'] ?: null,
-            'timezone' => $validated['timezone'],
-        ]);
-
         $device->wateringRule()->updateOrCreate(
             ['device_id' => $device->id],
             [
@@ -279,7 +270,7 @@ class DeviceController extends Controller
 
         return redirect()
             ->route('devices.show', $device)
-            ->with('success', 'Device settings updated successfully.');
+            ->with('success', 'Automation settings updated successfully.');
     }
 
     public function waterNow(Request $request, Device $device): RedirectResponse
