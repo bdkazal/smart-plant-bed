@@ -83,6 +83,7 @@ function initSmartFountainDashboard() {
     const dirtyForms = new Set();
     const latestOutputStates = {};
     let isWaterSafetyLocked = root.dataset.waterSafetyLocked === '1';
+    let isDeviceOnline = true;
 
     const showDirtyNote = (outputKey, show) => {
         document.getElementById(dirtyNoteId(outputKey))?.classList.toggle('hidden', !show);
@@ -90,6 +91,7 @@ function initSmartFountainDashboard() {
 
     const markFormDirty = (outputKey) => {
         if (outputKey === 'pump' && isWaterSafetyLocked) return;
+        if (!isDeviceOnline) return;
         dirtyForms.add(outputKey);
         showDirtyNote(outputKey, true);
     };
@@ -105,6 +107,31 @@ function initSmartFountainDashboard() {
         applyOutputInputs(outputKey, state, true);
     };
 
+    const setOutputFormDisabled = (outputKey, disabled) => {
+        const form = document.querySelector(`[data-output-form="${outputKey}"]`);
+        if (!form) return;
+
+        form.querySelectorAll('input, select, button[type="submit"]').forEach((control) => {
+            control.disabled = disabled;
+        });
+    };
+
+    const updateOfflineLock = (isOnline) => {
+        isDeviceOnline = Boolean(isOnline);
+
+        document.getElementById('offline-note')?.classList.toggle('hidden', isDeviceOnline);
+
+        ['pump', 'cob_light', 'rgb_light'].forEach((outputKey) => {
+            if (!isDeviceOnline) clearFormDirty(outputKey);
+            setOutputFormDisabled(outputKey, !isDeviceOnline);
+        });
+
+        if (!isDeviceOnline) {
+            const pumpButton = document.getElementById('pump-submit-button');
+            if (pumpButton) pumpButton.textContent = 'Device Offline';
+        }
+    };
+
     const updatePumpSafetyLock = (isLocked) => {
         isWaterSafetyLocked = Boolean(isLocked);
         root.dataset.waterSafetyLocked = isWaterSafetyLocked ? '1' : '0';
@@ -118,18 +145,20 @@ function initSmartFountainDashboard() {
         if (isWaterSafetyLocked) clearFormDirty('pump');
 
         if (checkbox) {
-            checkbox.disabled = isWaterSafetyLocked;
+            checkbox.disabled = !isDeviceOnline || isWaterSafetyLocked;
             if (isWaterSafetyLocked) checkbox.checked = false;
         }
 
         if (speedInput) {
-            speedInput.disabled = isWaterSafetyLocked;
+            speedInput.disabled = !isDeviceOnline || isWaterSafetyLocked;
             if (isWaterSafetyLocked) speedInput.value = 0;
         }
 
         if (submitButton) {
-            submitButton.disabled = isWaterSafetyLocked;
-            submitButton.textContent = isWaterSafetyLocked ? 'Pump Locked by Water Safety' : 'Send Pump Command';
+            submitButton.disabled = !isDeviceOnline || isWaterSafetyLocked;
+            submitButton.textContent = !isDeviceOnline
+                ? 'Device Offline'
+                : (isWaterSafetyLocked ? 'Pump Locked by Water Safety' : 'Send Pump Command');
         }
 
         safetyNote?.classList.toggle('hidden', !isWaterSafetyLocked);
@@ -141,8 +170,10 @@ function initSmartFountainDashboard() {
     };
 
     const updateOnlineStatus = (device) => {
+        const online = Boolean(device.is_online);
+
         setText('device-name', device.name);
-        setText('device-status', device.is_online ? 'Online' : 'Offline');
+        setText('device-status', online ? 'Online' : 'Offline');
         setText('device-type', device.display_type);
         setText('device-location', device.location_label);
         setText('device-timezone', device.timezone);
@@ -150,11 +181,11 @@ function initSmartFountainDashboard() {
 
         const badge = document.getElementById('online-badge');
         if (badge) {
-            badge.innerHTML = `<span>${device.is_online ? 'Live' : 'Offline'}</span><span class="status-dot"></span>`;
-            badge.className = device.is_online ? 'status-pill' : 'status-pill offline';
+            badge.innerHTML = `<span>${online ? 'Live' : 'Offline'}</span><span class="status-dot"></span>`;
+            badge.className = online ? 'status-pill' : 'status-pill offline';
         }
 
-        document.getElementById('offline-note')?.classList.toggle('hidden', device.is_online);
+        updateOfflineLock(online);
     };
 
     const updateWaterSafety = (readings) => {
