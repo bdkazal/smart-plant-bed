@@ -15,6 +15,92 @@
     display: none !important;
 }
 
+/* Plant Bed dashboard polish: keep the soil gauge as the main content but make the top hero feel like the Smart Fountain screen. */
+body.plant-bed-dashboard .hero {
+    position: relative;
+    overflow: hidden;
+    align-items: flex-start;
+    margin-bottom: 16px !important;
+    padding: 18px !important;
+    border-radius: 28px !important;
+    color: #fff !important;
+    background:
+        radial-gradient(circle at 82% 18%, rgba(34, 197, 94, .48), transparent 8rem),
+        radial-gradient(circle at 88% 88%, rgba(14, 165, 233, .28), transparent 9rem),
+        linear-gradient(145deg, #132033 0%, #061225 100%) !important;
+    box-shadow: 0 22px 50px rgba(2, 6, 23, .24) !important;
+}
+
+body.plant-bed-dashboard .hero::after {
+    content: '🌱';
+    position: absolute;
+    right: 18px;
+    bottom: 14px;
+    font-size: 42px;
+    opacity: .16;
+    filter: drop-shadow(0 12px 24px rgba(15, 23, 42, .25));
+    pointer-events: none;
+}
+
+body.plant-bed-dashboard .hero .title {
+    color: #fff !important;
+    font-size: 28px !important;
+    line-height: 1.05 !important;
+    font-weight: 950 !important;
+    letter-spacing: -.055em !important;
+}
+
+body.plant-bed-dashboard .hero .subtitle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    margin-top: 14px !important;
+    padding: 10px 12px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, .12);
+    background: rgba(255, 255, 255, .10);
+    color: #dbeafe !important;
+    font-size: 13px !important;
+    font-weight: 850;
+    backdrop-filter: blur(12px);
+}
+
+body.plant-bed-dashboard .hero .subtitle::before {
+    content: 'Location:';
+    color: #bfdbfe;
+    font-size: 11px;
+    font-weight: 950;
+}
+
+body.plant-bed-dashboard .status-box-label {
+    color: #e2e8f0 !important;
+    font-size: 12px !important;
+    font-weight: 950 !important;
+}
+
+body.plant-bed-dashboard .hero .status-pill {
+    background: rgba(34, 197, 94, .16) !important;
+    color: #bbf7d0 !important;
+    border: 1px solid rgba(187, 247, 208, .22) !important;
+}
+
+body.plant-bed-dashboard .hero .status-pill.offline {
+    background: rgba(148, 163, 184, .18) !important;
+    color: #e2e8f0 !important;
+    border-color: rgba(226, 232, 240, .2) !important;
+}
+
+@media (max-width: 420px) {
+    body.plant-bed-dashboard .hero .title {
+        font-size: 25px !important;
+    }
+
+    body.plant-bed-dashboard .hero .subtitle {
+        width: 100%;
+    }
+}
+
 /* Smart Fountain dashboard polish: keep hero compact and move last sync to the bottom. */
 body.smart-fountain-dashboard .hero-meta {
     grid-template-columns: 1fr !important;
