@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Device;
 use App\Models\DeviceCommand;
 use App\Models\DeviceScheduleRange;
 use Carbon\Carbon;
@@ -36,6 +37,7 @@ class CheckSmartFountainSchedules extends Command
             ->get();
 
         $createdCount = 0;
+        $skippedOfflineCount = 0;
 
         foreach ($schedules as $schedule) {
             $device = $schedule->device;
@@ -63,6 +65,11 @@ class CheckSmartFountainSchedules extends Command
                 continue;
             }
 
+            if (! $this->isDeviceOnline($device)) {
+                $skippedOfflineCount++;
+                continue;
+            }
+
             if ($this->queueSceneCommand($schedule)) {
                 $schedule->update([
                     'last_started_on' => $currentDate,
@@ -73,7 +80,7 @@ class CheckSmartFountainSchedules extends Command
             }
         }
 
-        $this->info("Created {$createdCount} Smart Fountain timeline command(s).");
+        $this->info("Created {$createdCount} Smart Fountain timeline command(s). Skipped {$skippedOfflineCount} offline device schedule(s).");
 
         return self::SUCCESS;
     }
@@ -125,6 +132,11 @@ class CheckSmartFountainSchedules extends Command
         ]);
 
         return true;
+    }
+
+    private function isDeviceOnline(Device $device): bool
+    {
+        return $device->last_seen_at?->gt(now()->subSeconds(20)) ?? false;
     }
 
     private function normalizeTime(string $time): ?string
