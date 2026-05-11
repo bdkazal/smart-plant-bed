@@ -201,8 +201,11 @@ class DeviceStateController extends Controller
             $source = $state['source'] ?? 'device_state';
             unset($state['source']);
 
+            // Device state sync is the actual hardware report, so replace the
+            // output state instead of merging. This prevents stale safety/debug
+            // fields from staying after the device reports a clean state.
             $deviceOutput->update([
-                'state' => array_merge($deviceOutput->state ?? [], $state),
+                'state' => $state,
                 'last_changed_source' => $source,
                 'last_changed_at' => now(),
             ]);
