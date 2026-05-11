@@ -119,17 +119,16 @@ function initSmartFountainDashboard() {
     const updateOfflineLock = (isOnline) => {
         isDeviceOnline = Boolean(isOnline);
 
-        document.getElementById('offline-note')?.classList.toggle('hidden', isDeviceOnline);
+        const offlineNote = document.getElementById('offline-note');
+        if (offlineNote) {
+            offlineNote.textContent = 'Device is offline. Live fountain commands are disabled until the device reconnects.';
+            offlineNote.classList.toggle('hidden', isDeviceOnline);
+        }
 
         ['pump', 'cob_light', 'rgb_light'].forEach((outputKey) => {
             if (!isDeviceOnline) clearFormDirty(outputKey);
             setOutputFormDisabled(outputKey, !isDeviceOnline);
         });
-
-        if (!isDeviceOnline) {
-            const pumpButton = document.getElementById('pump-submit-button');
-            if (pumpButton) pumpButton.textContent = 'Device Offline';
-        }
     };
 
     const updatePumpSafetyLock = (isLocked) => {
@@ -156,9 +155,7 @@ function initSmartFountainDashboard() {
 
         if (submitButton) {
             submitButton.disabled = !isDeviceOnline || isWaterSafetyLocked;
-            submitButton.textContent = !isDeviceOnline
-                ? 'Device Offline'
-                : (isWaterSafetyLocked ? 'Pump Locked by Water Safety' : 'Send Pump Command');
+            submitButton.textContent = isWaterSafetyLocked ? 'Pump Locked by Water Safety' : 'Send Pump Command';
         }
 
         safetyNote?.classList.toggle('hidden', !isWaterSafetyLocked);
