@@ -219,7 +219,10 @@ function smartFountainScenesStatusUrl() {
 function setSmartFountainSceneButtonsOffline(isOffline) {
     document.querySelectorAll('.apply-btn').forEach((button) => {
         button.disabled = isOffline;
-        button.textContent = isOffline ? 'Device Offline' : 'Apply Scene';
+        button.textContent = 'Apply Scene';
+        button.style.cursor = isOffline ? 'not-allowed' : '';
+        button.style.background = isOffline ? '#94a3b8' : '';
+        button.style.boxShadow = isOffline ? 'none' : '';
     });
 }
 
@@ -232,8 +235,16 @@ function ensureSmartFountainScenesOfflineNotice() {
 
     const note = document.createElement('div');
     note.id = 'scene-offline-note';
-    note.className = 'offline-note';
     note.textContent = 'Device is offline. Scene apply is disabled until the fountain reconnects.';
+    note.style.marginBottom = '13px';
+    note.style.borderRadius = '18px';
+    note.style.border = '1px solid #fde68a';
+    note.style.background = '#fffbeb';
+    note.style.color = '#92400e';
+    note.style.padding = '13px';
+    note.style.fontSize = '13px';
+    note.style.lineHeight = '1.42';
+    note.style.fontWeight = '750';
     hero.insertAdjacentElement('afterend', note);
 }
 
@@ -254,9 +265,12 @@ async function refreshSmartFountainScenesPage() {
 
         const data = await response.json();
         const isOffline = !Boolean(data?.device?.is_online);
+        const note = document.getElementById('scene-offline-note');
 
         if (isOffline) {
             ensureSmartFountainScenesOfflineNotice();
+        } else if (note) {
+            note.remove();
         }
 
         setSmartFountainSceneButtonsOffline(isOffline);
