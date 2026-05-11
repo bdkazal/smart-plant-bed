@@ -91,6 +91,45 @@ body.plant-bed-dashboard .hero .status-pill.offline {
     border-color: rgba(226, 232, 240, .2) !important;
 }
 
+body.plant-bed-dashboard .quick-link {
+    position: relative;
+    overflow: hidden;
+    border-radius: 18px !important;
+    border-color: rgba(148, 163, 184, .24) !important;
+    background: rgba(255, 255, 255, .78) !important;
+    box-shadow: 0 12px 26px rgba(15, 23, 42, .06);
+}
+
+body.plant-bed-dashboard .quick-link::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 4px;
+    background: linear-gradient(90deg, #38bdf8, #2563eb);
+}
+
+body.plant-bed-dashboard .quick-link:nth-child(1)::before {
+    background: linear-gradient(90deg, #22c55e, #14b8a6);
+}
+
+body.plant-bed-dashboard .quick-link:nth-child(2)::before {
+    background: linear-gradient(90deg, #f59e0b, #f97316);
+}
+
+body.plant-bed-dashboard .quick-link:nth-child(3)::before {
+    background: linear-gradient(90deg, #8b5cf6, #2563eb);
+}
+
+body.plant-bed-dashboard .quick-link:nth-child(4)::before {
+    background: linear-gradient(90deg, #38bdf8, #22c55e);
+}
+
+body.plant-bed-dashboard .quick-link strong,
+body.plant-bed-dashboard .quick-link span {
+    position: relative;
+    z-index: 1;
+}
+
 @media (max-width: 420px) {
     body.plant-bed-dashboard .hero .title {
         font-size: 25px !important;
