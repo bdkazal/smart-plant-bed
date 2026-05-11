@@ -263,6 +263,37 @@
             line-height: 1.35;
         }
 
+        .safety-limit-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            align-items: end;
+        }
+
+        .safety-limit-grid .field {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 0;
+            min-width: 0;
+        }
+
+        .safety-limit-grid .label {
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            min-height: 42px;
+            margin-bottom: 8px;
+            line-height: 1.25;
+        }
+
+        .safety-limit-grid .label span {
+            display: block;
+        }
+
+        .safety-limit-grid .input {
+            width: 100%;
+        }
+
         .save-button {
             width: 100%;
             min-height: 50px;
@@ -416,19 +447,19 @@
                             <h2 class="card-title">Safety Limits</h2>
                             <p class="card-note">Protect the pump and prevent over-watering.</p>
 
-                            <div class="form-grid three">
+                            <div class="safety-limit-grid">
                                 <div class="field">
-                                    <label for="max_watering_duration_seconds" class="label">Max Duration (sec)</label>
+                                    <label for="max_watering_duration_seconds" class="label">Max Duration <span>(sec)</span></label>
                                     <input type="number" name="max_watering_duration_seconds" id="max_watering_duration_seconds" min="1" max="300" value="{{ old('max_watering_duration_seconds', $device->wateringRule?->max_watering_duration_seconds ?? 30) }}" class="input" required>
                                 </div>
 
                                 <div class="field">
-                                    <label for="cooldown_minutes" class="label">Cooldown (min)</label>
+                                    <label for="cooldown_minutes" class="label">Cooldown <span>(min)</span></label>
                                     <input type="number" name="cooldown_minutes" id="cooldown_minutes" min="0" max="1440" value="{{ old('cooldown_minutes', $device->wateringRule?->cooldown_minutes ?? 60) }}" class="input" required>
                                 </div>
 
                                 <div class="field">
-                                    <label for="local_manual_duration_seconds" class="label">Local Manual (sec)</label>
+                                    <label for="local_manual_duration_seconds" class="label">Local Manual <span>(sec)</span></label>
                                     <input type="number" name="local_manual_duration_seconds" id="local_manual_duration_seconds" min="1" max="300" value="{{ old('local_manual_duration_seconds', $device->wateringRule?->local_manual_duration_seconds ?? 30) }}" class="input" required>
                                 </div>
                             </div>
