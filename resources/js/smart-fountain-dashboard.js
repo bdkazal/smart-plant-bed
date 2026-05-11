@@ -54,9 +54,30 @@ function applyOutputInputs(outputKey, state, force = false) {
     }
 }
 
+function ensureDeviceSettingsShortcut(root) {
+    if (document.getElementById('smart-fountain-settings-shortcut')) return;
+
+    const quickActions = root.querySelector('.quick-actions');
+    if (!quickActions) return;
+
+    const basePath = window.location.pathname.replace(/\/$/, '');
+    const settingsUrl = `${basePath}/settings`;
+
+    const link = document.createElement('a');
+    link.id = 'smart-fountain-settings-shortcut';
+    link.href = settingsUrl;
+    link.className = 'quick-action';
+    link.style.gridColumn = '1 / -1';
+    link.innerHTML = '<strong>Device Settings</strong><span>Rename this fountain, update area, or timezone</span>';
+
+    quickActions.appendChild(link);
+}
+
 function initSmartFountainDashboard() {
     const root = document.querySelector('[data-smart-fountain-dashboard]');
     if (!root) return;
+
+    ensureDeviceSettingsShortcut(root);
 
     const statusUrl = root.dataset.statusUrl;
     const dirtyForms = new Set();
