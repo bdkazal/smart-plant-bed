@@ -151,13 +151,31 @@
         }
 
         .card {
+            position: relative;
+            overflow: hidden;
             margin-bottom: 14px;
             border-radius: 22px;
             border: 1px solid rgba(255, 255, 255, .86);
             background: rgba(255, 255, 255, .78);
             box-shadow: 0 18px 38px rgba(15, 23, 42, .09), inset 0 1px 0 rgba(255, 255, 255, .86);
             backdrop-filter: blur(16px);
-            padding: 16px;
+            padding: 20px 16px 16px;
+        }
+
+        .card::before {
+            content: "";
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 4px;
+            background: linear-gradient(90deg, #38bdf8, #2563eb);
+        }
+
+        .card.automation-card::before {
+            background: linear-gradient(90deg, #22c55e, #14b8a6);
+        }
+
+        .card.safety-card::before {
+            background: linear-gradient(90deg, #f59e0b, #f97316);
         }
 
         .card-title {
@@ -407,7 +425,7 @@
                             </div>
                         </section> -->
 
-                        <section class="card">
+                        <section class="card automation-card">
                             <h2 class="card-title">Watering Mode</h2>
                             <!-- <p class="card-note">Choose whether watering runs by sensor threshold or saved schedules.</p> -->
 
@@ -443,7 +461,7 @@
                             </div>
                         </section>
 
-                        <section class="card">
+                        <section class="card safety-card">
                             <h2 class="card-title">Safety Limits</h2>
                             <p class="card-note">Protect the pump and prevent over-watering.</p>
 
