@@ -104,6 +104,9 @@ function plantBedStatusUrl() {
 
 function ensurePlantBedSettingsShortcut() {
     if (!document.getElementById('soil-gauge-progress')) return;
+
+    document.body.classList.add('plant-bed-dashboard');
+
     if (document.getElementById('plant-bed-settings-shortcut')) return;
 
     const quickLinks = document.querySelector('.quick-links');
