@@ -347,9 +347,9 @@
                     <form action="{{ route('devices.settings.update', $device) }}" method="POST">
                         @csrf
 
-                        <section class="card">
+                        <!-- <section class="card">
                             <h2 class="card-title">Device Identity</h2>
-                            <!-- <p class="card-note">Customer-facing name, location, and timezone.</p> -->
+                            <p class="card-note">Customer-facing name, location, and timezone.</p>
 
                             <div class="form-grid two">
                                 <div class="field">
@@ -374,7 +374,7 @@
                                 </select>
                                 <p class="hint">All schedules use this timezone.</p>
                             </div>
-                        </section>
+                        </section> -->
 
                         <section class="card">
                             <h2 class="card-title">Watering Mode</h2>
