@@ -23,7 +23,9 @@ class SmartFountainSceneController extends Controller
             'scenes' => fn ($query) => $query->latest(),
         ]);
 
-        return view('devices.smart-fountain.scenes.index', compact('device'));
+        $isOnline = $this->isDeviceOnline($device);
+
+        return view('devices.smart-fountain.scenes.index', compact('device', 'isOnline'));
     }
 
     public function create(Device $device): View
@@ -103,6 +105,14 @@ class SmartFountainSceneController extends Controller
                 ->route('devices.smart-fountain.scenes.index', $device)
                 ->withErrors([
                     'scene' => 'Scene can only be applied when the device is active in this account.',
+                ]);
+        }
+
+        if (! $this->isDeviceOnline($device)) {
+            return redirect()
+                ->route('devices.smart-fountain.scenes.index', $device)
+                ->withErrors([
+                    'scene' => 'Device is offline. Fountain scenes are disabled until the device reconnects.',
                 ]);
         }
 
@@ -208,5 +218,10 @@ class SmartFountainSceneController extends Controller
         if (! $device->isSmartFountain()) {
             abort(404);
         }
+    }
+
+    private function isDeviceOnline(Device $device): bool
+    {
+        return $device->last_seen_at?->gt(now()->subSeconds(20)) ?? false;
     }
 }
