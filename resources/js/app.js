@@ -102,6 +102,25 @@ function plantBedStatusUrl() {
     return `${path}/status`;
 }
 
+function ensurePlantBedSettingsShortcut() {
+    if (!document.getElementById('soil-gauge-progress')) return;
+    if (document.getElementById('plant-bed-settings-shortcut')) return;
+
+    const quickLinks = document.querySelector('.quick-links');
+    if (!quickLinks) return;
+
+    const basePath = window.location.pathname.replace(/\/$/, '');
+    const settingsUrl = `${basePath}/settings`;
+
+    const link = document.createElement('a');
+    link.id = 'plant-bed-settings-shortcut';
+    link.href = settingsUrl;
+    link.className = 'quick-link';
+    link.innerHTML = '<strong>Device Settings</strong><span>Rename this plant bed, update area, or timezone.</span>';
+
+    quickLinks.appendChild(link);
+}
+
 async function refreshPlantBedDashboard() {
     const url = plantBedStatusUrl();
 
@@ -186,6 +205,7 @@ function polishSmartFountainDashboard() {
 }
 
 window.addEventListener('DOMContentLoaded', () => {
+    ensurePlantBedSettingsShortcut();
     refreshPlantBedDashboard();
     setInterval(refreshPlantBedDashboard, 5000);
     polishSmartFountainDashboard();
