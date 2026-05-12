@@ -40,13 +40,17 @@ class DeviceConfigController extends Controller
         }
 
         $rule = $device->wateringRule;
+        $timezone = $device->timezone ?? 'Asia/Dhaka';
+        $serverNow = now($timezone);
 
         return response()->json([
             'message' => 'Device config fetched successfully.',
+            'server_time' => $serverNow->format('Y-m-d H:i:s'),
             'config' => [
                 'device_uuid' => $device->uuid,
                 'device_name' => $device->name,
-                'timezone' => $device->timezone ?? 'Asia/Dhaka',
+                'timezone' => $timezone,
+                'timezone_offset_minutes' => $serverNow->utcOffset(),
                 'watering_mode' => $rule?->watering_mode ?? 'schedule',
                 'soil_moisture_threshold' => $rule?->soil_moisture_threshold,
                 'max_watering_duration_seconds' => $rule?->max_watering_duration_seconds ?? 30,
