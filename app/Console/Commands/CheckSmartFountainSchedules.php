@@ -10,24 +10,18 @@ use Illuminate\Console\Command;
 
 class CheckSmartFountainSchedules extends Command
 {
-    protected $signature = 'smart-fountain:check-schedules {--day=} {--time=}';
+    protected $signature = 'smart-fountain:check-schedules {--time=}';
 
     protected $description = 'Check Smart Fountain daily timeline blocks and create scene commands when due';
 
     public function handle(): int
     {
-        $overrideDay = $this->option('day') ? (int) $this->option('day') : null;
         $overrideTime = $this->option('time')
             ? $this->normalizeTime((string) $this->option('time'))
             : null;
 
         if ($this->option('time') && ! $overrideTime) {
             $this->error('Invalid --time value. Use HH:MM or HH:MM:SS');
-            return self::FAILURE;
-        }
-
-        if (! is_null($overrideDay) && ($overrideDay < 1 || $overrideDay > 7)) {
-            $this->error('Invalid --day value. Use 1 to 7 (1=Monday, 7=Sunday).');
             return self::FAILURE;
         }
 
@@ -49,13 +43,8 @@ class CheckSmartFountainSchedules extends Command
             $deviceTimezone = $device->timezone ?: 'Asia/Dhaka';
             $deviceNow = Carbon::now($deviceTimezone);
 
-            $currentDayOfWeek = $overrideDay ?? $deviceNow->dayOfWeekIso;
             $currentTime = $overrideTime ?? $deviceNow->format('H:i:00');
             $currentDate = $deviceNow->toDateString();
-
-            if (! in_array((int) $currentDayOfWeek, $schedule->days_of_week ?? [], true)) {
-                continue;
-            }
 
             if ($currentTime !== $schedule->start_time) {
                 continue;
@@ -72,6 +61,7 @@ class CheckSmartFountainSchedules extends Command
 
             if ($this->queueSceneCommand($schedule)) {
                 $schedule->update([
+                    'days_of_week' => [1, 2, 3, 4, 5, 6, 7],
                     'last_started_on' => $currentDate,
                     'last_started_at' => now(),
                 ]);
@@ -80,7 +70,7 @@ class CheckSmartFountainSchedules extends Command
             }
         }
 
-        $this->info("Created {$createdCount} Smart Fountain timeline command(s). Skipped {$skippedOfflineCount} offline device schedule(s).");
+        $this->info("Created {$createdCount} Smart Fountain daily timeline command(s). Skipped {$skippedOfflineCount} offline device schedule(s).");
 
         return self::SUCCESS;
     }
@@ -125,6 +115,7 @@ class CheckSmartFountainSchedules extends Command
                 'schedule_name' => $schedule->name,
                 'schedule_period' => $schedule->period_key,
                 'schedule_phase' => 'start',
+                'repeat' => 'daily',
                 'outputs' => $outputs,
             ],
             'status' => 'pending',
