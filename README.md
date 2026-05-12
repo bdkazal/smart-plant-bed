@@ -28,8 +28,9 @@ The long project notes are split into focused files under `docs/`.
 | [`docs/PLANT_BED.md`](docs/PLANT_BED.md) | Smart Plant Bed behavior, automation modes, watering states, commands, schedules, offline behavior, and history. |
 | [`docs/OFFLINE_TIME_AND_SCHEDULE.md`](docs/OFFLINE_TIME_AND_SCHEDULE.md) | Confirmed RTC/server/NTP time priority, cached config behavior, and offline schedule fallback after server outage or device power loss. |
 | [`docs/SMART_FOUNTAIN.md`](docs/SMART_FOUNTAIN.md) | Smart Fountain persistent-state model, outputs, scenes, daily timeline schedule, water-level readings, offline behavior, and history. |
-| [`docs/DEVICE_API.md`](docs/DEVICE_API.md) | Shared device API endpoints, authentication, `/api/device/state`, ACK meaning, and firmware flow. |
+| [`docs/DEVICE_API.md`](docs/DEVICE_API.md) | Shared device API endpoints, authentication, `/api/device/config` time fields, `/api/device/state`, ACK meaning, and firmware flow. |
 | [`docs/SMART_FOUNTAIN_API_CONTRACT.md`](docs/SMART_FOUNTAIN_API_CONTRACT.md) | Firmware-facing Smart Fountain API contract with exact payload examples for config, state sync, commands, ACKs, safety, and offline behavior. |
+| [`docs/SMART_FOUNTAIN_API_TESTING.md`](docs/SMART_FOUNTAIN_API_TESTING.md) | Copy-paste Postman/curl tests for Smart Fountain config, state sync, commands, ACKs, low-water safety, and troubleshooting. |
 | [`docs/DATA_RETENTION.md`](docs/DATA_RETENTION.md) | History data retention, future pruning command, and customer UI record-count rules. |
 
 ---
@@ -151,6 +152,7 @@ The config endpoint includes device/server time fields for firmware sync:
 For Smart Fountain firmware integration, start with:
 
 - [`docs/SMART_FOUNTAIN_API_CONTRACT.md`](docs/SMART_FOUNTAIN_API_CONTRACT.md)
+- [`docs/SMART_FOUNTAIN_API_TESTING.md`](docs/SMART_FOUNTAIN_API_TESTING.md)
 - [`docs/DEVICE_API.md`](docs/DEVICE_API.md)
 
 For Plant Bed offline schedule behavior, start with:
@@ -196,5 +198,5 @@ When opening a new thread, start with:
 - [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md)
 - [`docs/PLATFORM_RULES.md`](docs/PLATFORM_RULES.md)
 - the product-specific doc, such as [`docs/PLANT_BED.md`](docs/PLANT_BED.md) or [`docs/SMART_FOUNTAIN.md`](docs/SMART_FOUNTAIN.md)
-- for firmware work, [`docs/SMART_FOUNTAIN_API_CONTRACT.md`](docs/SMART_FOUNTAIN_API_CONTRACT.md) or [`docs/DEVICE_API.md`](docs/DEVICE_API.md)
+- for firmware work, [`docs/SMART_FOUNTAIN_API_CONTRACT.md`](docs/SMART_FOUNTAIN_API_CONTRACT.md), [`docs/SMART_FOUNTAIN_API_TESTING.md`](docs/SMART_FOUNTAIN_API_TESTING.md), or [`docs/DEVICE_API.md`](docs/DEVICE_API.md)
 - for Plant Bed offline schedule/RTC work, [`docs/OFFLINE_TIME_AND_SCHEDULE.md`](docs/OFFLINE_TIME_AND_SCHEDULE.md)
