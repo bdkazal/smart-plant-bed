@@ -72,9 +72,17 @@ Dashboard sends command
 → Laravel creates pending output_set / scene_apply
 → Device polls command
 → Device acknowledges command
-→ Device executes command
-→ Laravel applies the output state
-→ Dashboard auto-refresh shows the new state
+→ Device applies command locally
+→ Device ACKs executed or failed
+→ Device POSTs /api/device/state with actual hardware state
+→ Dashboard auto-refresh shows the confirmed actual state
+```
+
+Backend ACK behavior:
+
+```text
+ACK executed may update the server-known requested/applied state quickly.
+POST /api/device/state is the final trusted hardware truth.
 ```
 
 Recommended real-device flow:
@@ -83,7 +91,7 @@ Recommended real-device flow:
 1. Poll pending command
 2. ACK acknowledged
 3. Apply output locally
-4. ACK executed
+4. ACK executed or failed
 5. POST /api/device/state with actual outputs/readings
 ```
 
