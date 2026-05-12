@@ -38,9 +38,10 @@ Recommended loop:
 
 ```text
 1. Fetch config at boot.
-2. Send state/readings every few seconds.
-3. Poll pending commands every few seconds.
-4. When command exists:
+2. Sync time from server_time_utc when config is reachable.
+3. Send state/readings every few seconds.
+4. Poll pending commands every few seconds.
+5. When command exists:
    - ACK acknowledged.
    - Apply command locally.
    - ACK executed or failed.
@@ -89,11 +90,15 @@ Example response shape:
 ```json
 {
   "message": "Device config fetched successfully.",
+  "server_time_utc": "2026-05-12T16:46:13+00:00",
+  "server_time_local": "2026-05-12 22:46:13",
+  "server_time": "2026-05-12 22:46:13",
   "config": {
     "device_uuid": "c2e6eb95-dc09-4344-a996-bc43b3c24da5",
     "device_name": "Biztola Smart Fountain",
     "device_type": "smart_fountain",
     "timezone": "Asia/Dhaka",
+    "timezone_offset_minutes": 360,
     "behavior_type": "persistent_state",
     "capabilities": {
       "pump_output": {
@@ -162,7 +167,17 @@ Example response shape:
 }
 ```
 
-Firmware should use this response to learn available outputs and the latest server-known output state.
+Firmware should use this response to learn available outputs, the latest server-known output state, and the current server/device time.
+
+Time rules:
+
+```text
+server_time_utc is the canonical time for RTC/NTP-style sync.
+server_time_local is for logs/display only.
+server_time is a backward-compatible local-time alias.
+timezone and timezone_offset_minutes are used for local display/schedule interpretation.
+RTC should store UTC time, not local wall-clock time.
+```
 
 ---
 
@@ -590,6 +605,7 @@ Command already closed:
 ```text
 [ ] Store device_uuid and X-DEVICE-KEY securely enough for MVP.
 [ ] Fetch config on boot.
+[ ] Sync UTC time from server_time_utc when available.
 [ ] Send /api/device/state regularly.
 [ ] Poll /api/device/commands regularly.
 [ ] Handle output_set.
