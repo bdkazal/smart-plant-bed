@@ -1,8 +1,10 @@
 # Smart Fountain Firmware Design
 
-This document defines the first ESP32 firmware design for the **Biztola Smart Fountain**.
+This document defines the ESP32 firmware design for the **Biztola Smart Fountain**.
 
-The goal is not to build one-off fountain firmware. The firmware should be organized as a reusable **Biztola IoT Platform Core** plus a product-specific **Smart Fountain Module**.
+The firmware must be designed as a reusable **Biztola IoT Platform Core** plus a product-specific **Smart Fountain Module**.
+
+This is important because the repository is no longer only a Smart Plant Bed project. Smart Fountain is one product inside the shared Biztola IoT Platform.
 
 ```text
 Biztola ESP32 Firmware
@@ -10,8 +12,9 @@ Biztola ESP32 Firmware
 │   ├── Wi-Fi connection
 │   ├── device identity
 │   ├── API client
-│   ├── config fetch
+│   ├── config fetch/cache
 │   ├── UTC time sync
+│   ├── local schedule engine
 │   ├── state sync
 │   ├── command polling
 │   ├── command ACK lifecycle
@@ -24,8 +27,36 @@ Biztola ESP32 Firmware
         ├── RGB light output
         ├── water-level sensor
         ├── local low-water safety
-        └── scene/output application
+        ├── scene/output application
+        └── offline daily timeline fallback
 ```
+
+---
+
+## Product decision: offline timeline is required
+
+Smart Fountain daily timeline must work offline after the device has successfully fetched and cached its config.
+
+Reason:
+
+```text
+Some customers may have unreliable internet or router/server downtime.
+A decorative/functional fountain should continue its Day/Evening/Night behavior locally.
+Local pump safety must also continue without internet.
+```
+
+So the correct V1 product behavior is:
+
+```text
+Laravel online    = Laravel is source of truth and creates scene_apply commands.
+Laravel offline   = ESP32 uses cached daily timeline and cached scenes locally.
+Wi-Fi offline     = ESP32 uses cached daily timeline and cached scenes locally.
+Device rebooted   = ESP32 restores UTC time from RTC if available, then can continue cached timeline.
+No valid time     = ESP32 must not run schedule fallback.
+No cached config  = ESP32 must not invent scenes or schedules.
+```
+
+Offline timeline fallback is not a replacement for Laravel. It is a fallback using the last known valid Laravel config.
 
 ---
 
@@ -52,6 +83,20 @@ POST /api/device/state replaces output state instead of merging.
 
 That means firmware should send clean, actual output state and should not depend on stale safety/debug fields remaining in Laravel.
 
+Current Laravel schedule behavior:
+
+```text
+Laravel creates scheduled scene_apply commands while the device is online.
+```
+
+Firmware must add local fallback behavior:
+
+```text
+When Laravel/API is not reachable, ESP32 applies cached daily timeline scenes locally.
+```
+
+Laravel may need to expose the daily timeline and scene payloads in `/api/device/config` if they are not already present in the current config response.
+
 ---
 
 ## Product identity
@@ -74,7 +119,7 @@ It does not mean the pump/light finished running.
 Example:
 
 ```text
-Pump ON at 60% keeps running until another command changes it or local safety forces it OFF.
+Pump ON at 60% keeps running until another command changes it, a timeline scene changes it, or local safety forces it OFF.
 ```
 
 ---
@@ -101,6 +146,7 @@ Rules:
 ```text
 Wi-Fi failure must not freeze the device.
 Local hardware safety must continue while offline.
+Local schedule fallback must continue while offline when valid cached config and valid time exist.
 No cloud commands can be received while offline.
 ```
 
@@ -145,7 +191,7 @@ Content-Type: application/json
 X-DEVICE-KEY: <device_api_key>
 ```
 
-### 4. Config fetch
+### 4. Config fetch and cache
 
 Endpoint:
 
@@ -164,14 +210,16 @@ behavior_type
 supported commands
 outputs from config
 safety flags
+scenes for Smart Fountain
+daily_timeline schedule for Smart Fountain
 ```
-
-Smart Fountain Module may use the config output states as initial desired/default output state.
 
 Firmware rule:
 
 ```text
 Config fetch should happen on boot and periodically after that.
+A successful config fetch should be saved to persistent storage.
+The cached config should survive ESP32 reboot.
 ```
 
 V1 intervals:
@@ -180,6 +228,13 @@ V1 intervals:
 boot config fetch: required when online
 periodic config refresh: every 5-15 minutes
 manual refresh: allowed later
+```
+
+Recommended persistent storage:
+
+```text
+ESP32 Preferences/NVS for small config
+LittleFS/SPIFFS later if config becomes large
 ```
 
 ### 5. UTC time sync
@@ -203,17 +258,53 @@ Do not hardcode Asia/Dhaka in firmware.
 Time source priority:
 
 ```text
-1. NTP time when available
-2. Laravel server_time_utc from /api/device/config
+1. NTP time when internet access is available
+2. Laravel server_time_utc from /api/device/config when Laravel is reachable
 3. RTC UTC backup when offline or after reboot
 4. no valid time: do not run local schedule fallback
 ```
 
-For Smart Fountain V1, Laravel currently creates scheduled timeline commands when the device is online. So the first fountain firmware skeleton does not need local schedule execution yet.
+For reliable offline daily timeline after power loss, RTC is strongly recommended.
 
-Still, Platform Core should keep the UTC time design reusable because Plant Bed already needs offline schedule behavior and future products may need it too.
+RTC status:
 
-### 6. State sync
+```text
+RTC module = optional/TBD in hardware list
+Product recommendation = include RTC for production units if offline schedule reliability matters
+```
+
+Without RTC:
+
+```text
+Offline schedule can continue only while ESP32 remains powered and already has valid time.
+After power loss + no internet + no RTC, schedule fallback cannot safely run.
+```
+
+### 6. Local schedule engine
+
+Platform Core should provide a reusable local schedule engine.
+
+Responsibilities:
+
+```text
+hold cached schedules/timeline
+convert UTC time to local time using timezone_offset_minutes
+match current local time against schedule start times
+prevent repeated firing of the same schedule in the same day
+notify product module when a local schedule should apply
+```
+
+For Smart Fountain V1:
+
+```text
+schedule type = daily_timeline
+schedule action = apply scene locally
+periods = Day / Evening / Night
+```
+
+The local schedule engine should be generic enough for future products, but the Smart Fountain Module decides how to apply a scene.
+
+### 7. State sync
 
 Endpoint:
 
@@ -232,7 +323,15 @@ state sync every 10-30 seconds later, depending on product need
 
 Firmware should send state even when no command exists, because state sync also updates `last_seen_at` and keeps the dashboard online.
 
-### 7. Command polling
+When reconnecting after offline timeline fallback:
+
+```text
+POST /api/device/state with the actual current output state.
+Do not try to ACK a local offline schedule as a cloud command because no cloud command exists.
+Use source such as offline_timeline in the output state.
+```
+
+### 8. Command polling
 
 Endpoint:
 
@@ -263,7 +362,7 @@ output_set
 scene_apply
 ```
 
-### 8. Command ACK lifecycle
+### 9. Command ACK lifecycle
 
 Endpoint:
 
@@ -271,7 +370,7 @@ Endpoint:
 POST /api/device/commands/{command}/ack
 ```
 
-Required lifecycle:
+Required cloud command lifecycle:
 
 ```text
 1. command received from poll endpoint
@@ -290,22 +389,18 @@ ACK failed means firmware could not apply the command.
 Final /api/device/state is the trusted hardware truth.
 ```
 
-Unknown command types:
+Local offline schedule lifecycle is different:
 
 ```text
-ACK failed with a short message.
-Do not crash.
-Do not silently mark unknown commands executed.
+1. cached timeline time matches locally
+2. apply cached scene locally
+3. update local actual output state
+4. when online, POST /api/device/state
 ```
 
-Unknown output keys:
+No ACK is sent for offline local schedule actions because there is no Laravel command ID.
 
-```text
-ignore safely or fail only that command, depending on command type.
-For V1, fail command if the target output is unknown.
-```
-
-### 9. Retry/offline handling
+### 10. Retry/offline handling
 
 Platform Core should track:
 
@@ -316,6 +411,7 @@ last_successful_api_at
 last_config_fetch_at
 last_state_sync_at
 last_command_poll_at
+last_offline_timeline_apply_at
 ```
 
 Rules:
@@ -324,15 +420,17 @@ Rules:
 If Wi-Fi/API is unavailable, skip cloud requests temporarily.
 Use backoff after repeated failures.
 Keep product loop and safety loop running.
-Do not replay old failed/expired commands.
-Do not invent cloud commands offline.
+Run cached timeline fallback when eligible.
+Do not replay old failed/expired cloud commands.
+Do not invent cloud command ACKs offline.
 ```
 
 Offline Smart Fountain behavior:
 
 ```text
-keep current local output state, unless safety changes it
+keep current local output state unless timeline or safety changes it
 keep low-water pump protection active
+apply cached daily timeline scenes at local start times
 no cloud command polling while offline
 state sync resumes when API becomes reachable
 ```
@@ -352,6 +450,7 @@ buildStatePayload()
 handleCommand(command)
 applyOutput(outputKey, state, source)
 applyScene(outputs, source)
+applyTimelineScene(period, scene)
 readSensors()
 enforceSafety()
 ```
@@ -363,12 +462,12 @@ enforceSafety()
 Current hardware choices are intentionally TBD.
 
 ```text
-pump pin            = TBD
-COB PWM pin         = TBD
-RGB type/pins       = TBD
+pump pin             = TBD
+COB PWM pin          = TBD
+RGB type/pins        = TBD
 water sensor ADC pin = TBD
-RTC module          = optional/TBD
-display             = optional/TBD
+RTC module           = optional/TBD, recommended for reliable offline timeline after power loss
+display              = optional/TBD
 ```
 
 Do not block firmware architecture on exact pins.
@@ -571,7 +670,8 @@ If `water_low=true`:
 2. force local pump state to enabled=false, speed_percent=0
 3. ignore pump ON commands
 4. allow COB/RGB light commands
-5. report pump OFF in the next /api/device/state payload
+5. allow timeline scenes to apply lights/RGB, but force pump OFF
+6. report pump OFF in the next /api/device/state payload
 ```
 
 If a pump ON command arrives while water is low:
@@ -583,22 +683,126 @@ ACK executed if the safe resulting state was applied
 POST /api/device/state with pump OFF and source=water_safety
 ```
 
+If an offline timeline scene includes pump ON while water is low:
+
+```text
+apply scene lights/RGB
+force pump OFF locally
+mark local source as water_safety or offline_timeline_safety
+sync state when online
+```
+
 Reason:
 
 ```text
 The backend may already rewrite unsafe pump commands, but hardware safety must not depend on Laravel or internet access.
 ```
 
-Recommended pump state in low-water state sync:
+---
+
+## Daily timeline offline fallback
+
+Smart Fountain has three customer-facing daily timeline blocks:
+
+```text
+Day
+Evening
+Night
+```
+
+Each block has:
+
+```text
+period name
+start local time
+scene id/name
+scene output payload
+```
+
+Firmware needs the last known valid timeline and scenes from Laravel config.
+
+Recommended config shape for firmware:
 
 ```json
 {
-  "pump": {
-    "enabled": false,
-    "speed_percent": 0,
-    "source": "water_safety"
+  "config": {
+    "device_type": "smart_fountain",
+    "timezone": "Asia/Dhaka",
+    "timezone_offset_minutes": 360,
+    "daily_timeline": {
+      "enabled": true,
+      "ranges": [
+        {
+          "period": "day",
+          "start_time": "06:00",
+          "scene_id": 1,
+          "scene_name": "Day Fountain",
+          "outputs": {
+            "pump": { "enabled": true, "speed_percent": 60 },
+            "cob_light": { "enabled": true, "brightness_percent": 40 },
+            "rgb_light": { "enabled": true, "brightness_percent": 35, "color": "#FFB066", "effect": "warm_glow" }
+          }
+        },
+        {
+          "period": "evening",
+          "start_time": "18:00",
+          "scene_id": 2,
+          "scene_name": "Night Glow",
+          "outputs": {}
+        },
+        {
+          "period": "night",
+          "start_time": "23:00",
+          "scene_id": 4,
+          "scene_name": "All Off",
+          "outputs": {}
+        }
+      ]
+    }
   }
 }
+```
+
+If Laravel does not currently return this shape, add it before final firmware integration.
+
+Offline timeline eligibility:
+
+```text
+cached config exists
+cached daily_timeline.enabled = true
+cached ranges are valid
+valid UTC time exists from NTP, Laravel, or RTC
+Laravel/API is not currently reachable, or command polling is failing
+```
+
+Trigger rule:
+
+```text
+Apply a period scene once when local HH:MM matches the period start_time.
+Prevent repeated application during the same minute/day.
+```
+
+Recommended trigger key:
+
+```text
+YYYY-MM-DD + period + start_time
+```
+
+Manual command vs offline timeline priority:
+
+```text
+When online, cloud commands win because Laravel is source of truth.
+When offline, cached timeline may apply scenes at scheduled start times.
+A manual command applied before going offline remains active until the next cached timeline start time.
+```
+
+Reconnect behavior:
+
+```text
+When API returns, immediately POST current actual state.
+Then fetch latest config.
+Then resume normal command polling.
+Do not replay offline timeline events as command ACKs.
 ```
 
 ---
@@ -606,19 +810,6 @@ Recommended pump state in low-water state sync:
 ## Command handling design
 
 ### output_set
-
-Example command payload:
-
-```json
-{
-  "output": "pump",
-  "state": {
-    "enabled": true,
-    "speed_percent": 60
-  },
-  "source": "dashboard"
-}
-```
 
 Firmware flow:
 
@@ -633,32 +824,6 @@ Firmware flow:
 ```
 
 ### scene_apply
-
-Example command payload:
-
-```json
-{
-  "scene_id": 1,
-  "scene_name": "Day Fountain",
-  "source": "scene:1",
-  "outputs": {
-    "pump": {
-      "enabled": true,
-      "speed_percent": 60
-    },
-    "cob_light": {
-      "enabled": true,
-      "brightness_percent": 40
-    },
-    "rgb_light": {
-      "enabled": true,
-      "brightness_percent": 35,
-      "color": "#FFB066",
-      "effect": "warm_glow"
-    }
-  }
-}
-```
 
 Firmware flow:
 
@@ -729,34 +894,26 @@ Recommended normal state payload:
 }
 ```
 
-Recommended low-water state payload:
+Recommended offline timeline state source:
 
 ```json
 {
-  "device_uuid": "<DEVICE_UUID>",
-  "device_type": "smart_fountain",
-  "firmware_version": "fountain-dev-0.1",
-  "operation_state": "running",
-  "outputs": {
-    "pump": {
-      "enabled": false,
-      "speed_percent": 0,
-      "source": "water_safety"
-    }
-  },
-  "readings": {
-    "water_low": {
-      "value": 1,
-      "unit": "boolean"
-    },
-    "water_level_percent": {
-      "value": 10,
-      "unit": "percent"
-    },
-    "water_level_raw": {
-      "value": 1234,
-      "unit": "adc"
-    }
+  "pump": {
+    "enabled": true,
+    "speed_percent": 60,
+    "source": "offline_timeline"
+  }
+}
+```
+
+Recommended low-water state source:
+
+```json
+{
+  "pump": {
+    "enabled": false,
+    "speed_percent": 0,
+    "source": "water_safety"
   }
 }
 ```
@@ -777,17 +934,20 @@ Recommended loop order:
 1. handle Wi-Fi reconnect/non-blocking network maintenance
 2. read sensors
 3. enforce local safety
-4. run output animations/effects
-5. fetch config if due and online
-6. sync state if due and online
-7. poll command if due and online
-8. process one command at a time
+4. update UTC/local time
+5. run offline daily timeline fallback if eligible
+6. run output animations/effects
+7. fetch config if due and online
+8. sync state if due and online
+9. poll command if due and online
+10. process one cloud command at a time
 ```
 
 Important:
 
 ```text
 Safety must run even when API requests fail.
+Offline timeline must run even when API requests fail, if valid cached config and valid time exist.
 RGB effects must not block command polling/state sync.
 HTTP timeouts should be short enough to keep local behavior responsive.
 ```
@@ -810,8 +970,9 @@ firmware/smart-fountain/
 │   │   ├── BiztolaApiClient.h
 │   │   ├── BiztolaApiClient.cpp
 │   │   ├── BiztolaConfig.h
+│   │   ├── BiztolaConfigCache.h
 │   │   ├── BiztolaTimeSync.h
-│   │   ├── BiztolaScheduler.h        # future/shared optional
+│   │   ├── BiztolaLocalSchedule.h
 │   │   └── BiztolaCommand.h
 │   └── products/
 │       └── smart_fountain/
@@ -819,6 +980,8 @@ firmware/smart-fountain/
 │           ├── SmartFountainModule.cpp
 │           ├── FountainOutputs.h
 │           ├── FountainOutputs.cpp
+│           ├── FountainTimeline.h
+│           ├── FountainTimeline.cpp
 │           ├── WaterLevelSensor.h
 │           └── WaterLevelSensor.cpp
 └── README.md
@@ -827,8 +990,8 @@ firmware/smart-fountain/
 For the first skeleton, fewer files are acceptable. But keep the separation clear:
 
 ```text
-Platform code talks to Laravel.
-Product code talks to fountain hardware.
+Platform code talks to Laravel and manages generic time/cache/scheduling.
+Product code talks to fountain hardware and applies fountain scenes safely.
 ```
 
 ---
@@ -842,6 +1005,10 @@ The first ESP32 skeleton should implement:
 [ ] connect to Wi-Fi
 [ ] fetch /api/device/config
 [ ] parse server_time_utc and config.device_type
+[ ] cache latest valid config locally
+[ ] parse/cache daily_timeline if present
+[ ] restore cached config after reboot
+[ ] sync/restore valid UTC time
 [ ] keep a local output state object
 [ ] read placeholder water sensor value
 [ ] enforce water_low pump safety locally
@@ -853,6 +1020,8 @@ The first ESP32 skeleton should implement:
 [ ] ACK executed after local apply
 [ ] ACK failed for unsupported/invalid command
 [ ] POST final actual state after every handled command
+[ ] apply cached daily timeline locally while offline
+[ ] POST current actual state after reconnect
 ```
 
 Hardware may be stubbed initially:
@@ -862,6 +1031,7 @@ pump write = log/apply local state only
 COB write = log/apply local state only
 RGB write = log/apply local state only
 water sensor = analogRead if pin known, otherwise placeholder value
+RTC = optional stub until module is chosen
 ```
 
 ---
@@ -873,7 +1043,6 @@ Do not build these yet unless required:
 ```text
 customer Wi-Fi provisioning UI
 QR claim flow
-local offline fountain schedule execution
 full RGB animation engine
 display UI
 OTA update
@@ -882,7 +1051,7 @@ advanced retry queue
 multi-product firmware binary
 ```
 
-Keep the first firmware small and testable.
+Offline Smart Fountain daily timeline fallback is not a non-goal anymore. It is part of the V1 firmware direction.
 
 ---
 
@@ -897,6 +1066,7 @@ Wi-Fi connected
 config fetched
 device_type = smart_fountain
 server_time_utc parsed
+config cached
 initial state posted
 Laravel dashboard shows device online
 ```
@@ -941,16 +1111,39 @@ lights still work
 state sync reports water_low=1 and pump OFF
 ```
 
-### 5. Offline test
+### 5. Offline timeline test without reboot
 
 Expected:
 
 ```text
+device online first and config cached
 stop Laravel or disconnect Wi-Fi
-firmware keeps running local loop
-low-water safety still works
-no cloud command polling while offline
-state sync resumes after reconnect
+valid device time remains available
+at next Day/Evening/Night start time, firmware applies cached scene locally
+water_low safety still overrides pump
+when online returns, firmware posts actual current state
+```
+
+### 6. Offline timeline test after reboot
+
+Expected with RTC:
+
+```text
+device online first and config cached
+RTC has valid UTC time
+stop Laravel / disconnect Wi-Fi
+power-cycle ESP32
+firmware restores cached config
+firmware restores UTC from RTC
+at next timeline start time, firmware applies cached scene locally
+```
+
+Expected without RTC:
+
+```text
+if device reboots offline and has no valid time, firmware does not run timeline fallback
+safety still runs
+outputs may remain default/safe until time is restored
 ```
 
 ---
@@ -963,20 +1156,35 @@ Do not make Plant Bed behavior depend on Smart Fountain commands.
 Do not treat all devices as timed watering devices.
 Do not treat all devices as persistent-state devices.
 Do not use soil_moisture for Smart Fountain water-level meaning.
-Do not mark commands executed before hardware/local state is applied.
+Do not mark cloud commands executed before hardware/local state is applied.
 Do not trust ACK executed as final dashboard truth; always send /api/device/state.
+Do not send ACK for local offline timeline actions because no cloud command exists.
 Do not depend on Laravel for pump safety.
+Do not run offline timeline without valid cached config and valid time.
 ```
 
 ---
 
 ## Next step
 
-After this document is accepted, start the ESP32 Smart Fountain firmware skeleton with:
+Before firmware skeleton starts, confirm or add the Laravel config shape for:
+
+```text
+config.daily_timeline.enabled
+config.daily_timeline.ranges[].period
+config.daily_timeline.ranges[].start_time
+config.daily_timeline.ranges[].scene_id
+config.daily_timeline.ranges[].scene_name
+config.daily_timeline.ranges[].outputs
+```
+
+Then start the ESP32 Smart Fountain firmware skeleton with:
 
 ```text
 Platform Core first
+config cache + UTC time + local schedule engine
 Smart Fountain Module second
 hardware pins left as TBD placeholders
 safe local pump behavior from the beginning
+offline daily timeline fallback included from the beginning
 ```
