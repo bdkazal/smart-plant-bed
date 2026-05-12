@@ -12,6 +12,7 @@ Build a simple, reliable smart watering system that allows a customer to:
 - water manually from a dashboard
 - automate watering by schedule
 - automate watering by soil moisture threshold
+- keep scheduled watering working during temporary server/network outages
 
 ## Current model
 
@@ -93,6 +94,53 @@ Monday 06:00 → Water for 30 seconds
 
 Schedule form duration should follow the Automation max watering duration setting.
 
+## Offline time and schedule behavior
+
+Plant Bed offline schedule fallback is now confirmed working after both:
+
+```text
+Laravel server outage
+ESP32/device power loss and reboot
+```
+
+The device can run cached schedules locally when Laravel is unavailable.
+
+Time source priority:
+
+```text
+1. NTP time when available
+2. Laravel server_time_utc from /api/device/config
+3. DS1307 RTC UTC backup time
+4. No valid time: local schedule fallback disabled
+```
+
+The RTC stores UTC time. The configured device timezone and timezone offset from Laravel are used to convert that UTC clock into local schedule/display time.
+
+Example:
+
+```text
+RTC UTC:          17:10:06
+Local Asia/Dhaka: 23:10:06
+```
+
+Offline schedule fallback runs only when:
+
+```text
+Laravel is not recently reachable
+watering_mode = schedule
+cached schedules contain an enabled schedule for current day/time
+device time is ready from NTP, Laravel UTC, or RTC
+valve/pump is not already watering
+```
+
+The schedule match window is the scheduled minute:
+
+```text
+Schedule 23:10:00 may trigger between 23:10:00 and 23:10:59
+```
+
+See `docs/OFFLINE_TIME_AND_SCHEDULE.md` for the full details.
+
 ## Offline behavior
 
 `devices.status = active` does not mean the physical device is online.
@@ -103,8 +151,9 @@ When the device is offline:
 
 ```text
 live sensor cards show N/A
-manual watering is unavailable
+manual watering is unavailable from dashboard
 old readings remain available in History
+device can continue local fallback schedule/auto behavior from cached config
 ```
 
 ## History behavior
