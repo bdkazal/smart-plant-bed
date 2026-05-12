@@ -131,7 +131,7 @@
                             <div>
                                 <p class="eyebrow">Smart Fountain Timeline</p>
                                 <h1 class="title">Edit {{ $schedule->name }}</h1>
-                                <p class="subtitle">Choose when this daily block starts and which scene runs. End time follows the next block automatically.</p>
+                                <p class="subtitle">Choose when this block starts and which scene runs. End time follows the next block automatically.</p>
                             </div>
                             <div class="period-icon">{{ $periodIcon }}</div>
                         </div>
@@ -142,23 +142,6 @@
                         @method('PUT')
 
                         <section class="form-grid">
-                            <div class="glass-card">
-                                <div class="card-accent"></div>
-                                <div class="card-body">
-                                    <div class="card-head">
-                                        <div class="icon-box">🔁</div>
-                                        <div>
-                                            <h2 class="card-title">Repeat</h2>
-                                            <p class="card-subtitle">Smart Fountain V1 repeats this timeline every day. Weekly rules are intentionally disabled for simpler offline firmware behavior.</p>
-                                        </div>
-                                    </div>
-
-                                    <div class="scene-preview">
-                                        This block runs every day when enabled.
-                                    </div>
-                                </div>
-                            </div>
-
                             <div class="glass-card">
                                 <div class="card-accent"></div>
                                 <div class="card-body">
