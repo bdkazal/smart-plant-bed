@@ -46,20 +46,30 @@ class DeviceConfigController extends Controller
             'last_seen_at' => now(),
         ]);
 
+        $timezone = $device->timezone ?? 'Asia/Dhaka';
+        $serverNowLocal = now($timezone);
+        $serverNowUtc = now('UTC');
+
         if ($device->isSmartFountain()) {
             return response()->json([
                 'message' => 'Device config fetched successfully.',
-                'config' => $this->smartFountainConfig($device->fresh(['capabilities', 'outputs'])),
+                'server_time_utc' => $serverNowUtc->toIso8601String(),
+                'server_time_local' => $serverNowLocal->format('Y-m-d H:i:s'),
+                'server_time' => $serverNowLocal->format('Y-m-d H:i:s'),
+                'config' => $this->smartFountainConfig($device->fresh(['capabilities', 'outputs']), $timezone, $serverNowLocal->utcOffset()),
             ]);
         }
 
         return response()->json([
             'message' => 'Device config fetched successfully.',
-            'config' => $this->plantBedConfig($device),
+            'server_time_utc' => $serverNowUtc->toIso8601String(),
+            'server_time_local' => $serverNowLocal->format('Y-m-d H:i:s'),
+            'server_time' => $serverNowLocal->format('Y-m-d H:i:s'),
+            'config' => $this->plantBedConfig($device, $timezone, $serverNowLocal->utcOffset()),
         ]);
     }
 
-    private function plantBedConfig(Device $device): array
+    private function plantBedConfig(Device $device, string $timezone, int $timezoneOffsetMinutes): array
     {
         $rule = $device->wateringRule;
 
@@ -67,7 +77,8 @@ class DeviceConfigController extends Controller
             'device_uuid' => $device->uuid,
             'device_name' => $device->name,
             'device_type' => $device->device_type,
-            'timezone' => $device->timezone ?? 'Asia/Dhaka',
+            'timezone' => $timezone,
+            'timezone_offset_minutes' => $timezoneOffsetMinutes,
             'watering_mode' => $rule?->watering_mode ?? 'schedule',
             'soil_moisture_threshold' => $rule?->soil_moisture_threshold,
             'max_watering_duration_seconds' => $rule?->max_watering_duration_seconds ?? 30,
@@ -85,13 +96,14 @@ class DeviceConfigController extends Controller
         ];
     }
 
-    private function smartFountainConfig(Device $device): array
+    private function smartFountainConfig(Device $device, string $timezone, int $timezoneOffsetMinutes): array
     {
         return [
             'device_uuid' => $device->uuid,
             'device_name' => $device->name,
             'device_type' => $device->device_type,
-            'timezone' => $device->timezone ?? 'Asia/Dhaka',
+            'timezone' => $timezone,
+            'timezone_offset_minutes' => $timezoneOffsetMinutes,
             'behavior_type' => 'persistent_state',
             'capabilities' => $device->capabilities->mapWithKeys(function ($capability) {
                 return [
