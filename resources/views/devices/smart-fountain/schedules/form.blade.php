@@ -63,11 +63,6 @@
         .input:focus, .select:focus { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(22,135,249,.13); }
         .helper { margin: 7px 0 0; color: var(--muted); font-size: 12px; font-weight: 700; line-height: 1.35; }
 
-        .day-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .day-chip { position: relative; display: flex; align-items: center; justify-content: center; min-height: 42px; border-radius: 999px; border: 1px solid rgba(148,163,184,.28); background: #fff; color: #334155; font-size: 13px; font-weight: 900; cursor: pointer; }
-        .day-chip input { position: absolute; opacity: 0; pointer-events: none; }
-        .day-chip:has(input:checked) { background: #dbeafe; border-color: #93c5fd; color: #1d4ed8; box-shadow: inset 0 0 0 1px rgba(37,99,235,.10); }
-
         .switch-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; }
         .switch-label { margin: 0; }
         .switch { position: relative; width: 54px; height: 31px; flex: 0 0 auto; }
@@ -94,7 +89,6 @@
             .app-content { padding: 16px 13px; }
             .title { font-size: 27px; }
             .actions { grid-template-columns: 1fr; }
-            .day-grid { grid-template-columns: 1fr; }
         }
     </style>
 </head>
@@ -137,7 +131,7 @@
                             <div>
                                 <p class="eyebrow">Smart Fountain Timeline</p>
                                 <h1 class="title">Edit {{ $schedule->name }}</h1>
-                                <p class="subtitle">Choose when this block starts and which scene runs. End time follows the next block automatically.</p>
+                                <p class="subtitle">Choose when this daily block starts and which scene runs. End time follows the next block automatically.</p>
                             </div>
                             <div class="period-icon">{{ $periodIcon }}</div>
                         </div>
@@ -152,20 +146,15 @@
                                 <div class="card-accent"></div>
                                 <div class="card-body">
                                     <div class="card-head">
-                                        <div class="icon-box">📅</div>
+                                        <div class="icon-box">🔁</div>
                                         <div>
-                                            <h2 class="card-title">Active Days</h2>
-                                            <p class="card-subtitle">Select when this timeline block is allowed to run.</p>
+                                            <h2 class="card-title">Repeat</h2>
+                                            <p class="card-subtitle">Smart Fountain V1 repeats this timeline every day. Weekly rules are intentionally disabled for simpler offline firmware behavior.</p>
                                         </div>
                                     </div>
 
-                                    <div class="day-grid">
-                                        @foreach ($dayNames as $dayNumber => $dayName)
-                                            <label class="day-chip">
-                                                <input type="checkbox" name="days_of_week[]" value="{{ $dayNumber }}" @checked(in_array($dayNumber, old('days_of_week', $schedule->days_of_week ?? [1,2,3,4,5,6,7])))>
-                                                <span>{{ $dayName }}</span>
-                                            </label>
-                                        @endforeach
+                                    <div class="scene-preview">
+                                        This block runs every day when enabled.
                                     </div>
                                 </div>
                             </div>
