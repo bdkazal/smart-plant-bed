@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Device;
+use App\Models\DeviceScheduleRange;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,6 +31,10 @@ class DeviceConfigController extends Controller
                 ->orderBy('time_of_day'),
             'capabilities',
             'outputs',
+            'scenes',
+            'scheduleRanges' => fn($query) => $query
+                ->with('startScene')
+                ->orderBy('start_time'),
         ])
             ->where('uuid', $validated['device_uuid'])
             ->where('api_key', $deviceKey)
@@ -56,7 +61,16 @@ class DeviceConfigController extends Controller
                 'server_time_utc' => $serverNowUtc->toIso8601String(),
                 'server_time_local' => $serverNowLocal->format('Y-m-d H:i:s'),
                 'server_time' => $serverNowLocal->format('Y-m-d H:i:s'),
-                'config' => $this->smartFountainConfig($device->fresh(['capabilities', 'outputs']), $timezone, $serverNowLocal->utcOffset()),
+                'config' => $this->smartFountainConfig(
+                    $device->fresh([
+                        'capabilities',
+                        'outputs',
+                        'scenes',
+                        'scheduleRanges.startScene',
+                    ]),
+                    $timezone,
+                    $serverNowLocal->utcOffset()
+                ),
             ]);
         }
 
@@ -125,6 +139,15 @@ class DeviceConfigController extends Controller
                     ],
                 ];
             }),
+            'scenes' => $device->scenes->map(function ($scene) {
+                return [
+                    'id' => $scene->id,
+                    'name' => $scene->name,
+                    'is_default' => (bool) $scene->is_default,
+                    'outputs' => $scene->outputs ?? [],
+                ];
+            })->values(),
+            'daily_timeline' => $this->smartFountainDailyTimeline($device),
             'safety' => [
                 'pump_requires_water_level_ok' => true,
                 'water_low_should_force_pump_off' => true,
@@ -137,5 +160,49 @@ class DeviceConfigController extends Controller
                 'execution_meaning' => 'executed means requested state was applied, not that the output finished running',
             ],
         ];
+    }
+
+    private function smartFountainDailyTimeline(Device $device): array
+    {
+        $ranges = $device->scheduleRanges
+            ->map(function (DeviceScheduleRange $range) {
+                $scene = $range->startScene;
+
+                return [
+                    'id' => $range->id,
+                    'period' => $range->period_key,
+                    'name' => $range->name,
+                    'is_enabled' => (bool) $range->is_enabled,
+                    'days_of_week' => $range->days_of_week ?? [],
+                    'start_time' => $this->formatTimelineTime($range->start_time),
+                    'end_time' => $this->formatTimelineTime($range->end_time),
+                    'scene_id' => $scene?->id,
+                    'scene_name' => $scene?->name,
+                    'outputs' => $scene?->outputs ?? [],
+                ];
+            })
+            ->values();
+
+        return [
+            'enabled' => $ranges->contains(fn(array $range) => $range['is_enabled']),
+            'ranges' => $ranges,
+        ];
+    }
+
+    private function formatTimelineTime(mixed $time): ?string
+    {
+        if (! $time) {
+            return null;
+        }
+
+        if (is_string($time)) {
+            return substr($time, 0, 5);
+        }
+
+        if (method_exists($time, 'format')) {
+            return $time->format('H:i');
+        }
+
+        return (string) $time;
     }
 }
