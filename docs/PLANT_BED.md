@@ -153,8 +153,10 @@ When the device is offline:
 live sensor cards show N/A
 manual watering is unavailable from dashboard
 old readings remain available in History
-device can continue local fallback schedule/auto behavior from cached config
+device can continue confirmed local schedule fallback from cached config
 ```
+
+Offline auto-mode watering from cached soil readings/config is not yet treated as a confirmed behavior in this document. It should be documented separately if/when tested.
 
 ## History behavior
 
