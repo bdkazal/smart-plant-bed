@@ -14,16 +14,6 @@ use Illuminate\View\View;
 
 class SmartFountainScheduleController extends Controller
 {
-    private const DAY_NAMES = [
-        1 => 'Monday',
-        2 => 'Tuesday',
-        3 => 'Wednesday',
-        4 => 'Thursday',
-        5 => 'Friday',
-        6 => 'Saturday',
-        7 => 'Sunday',
-    ];
-
     private const PERIOD_ORDER = ['day', 'evening', 'night'];
 
     private const PERIODS = [
@@ -49,12 +39,9 @@ class SmartFountainScheduleController extends Controller
         $this->authorizeSmartFountain($device);
         $this->ensureTimelineBlocks($device);
 
-        $schedules = $this->timelineSchedules($device);
-
         return view('devices.smart-fountain.schedules.index', [
             'device' => $device,
-            'schedules' => $schedules,
-            'dayNames' => self::DAY_NAMES,
+            'schedules' => $this->timelineSchedules($device),
         ]);
     }
 
@@ -64,7 +51,7 @@ class SmartFountainScheduleController extends Controller
 
         return redirect()
             ->route('devices.smart-fountain.schedules.index', $device)
-            ->with('success', 'Smart Fountain uses three fixed timeline blocks: Day, Evening, and Night. Edit one of them to change its start time or scene.');
+            ->with('success', 'Smart Fountain uses three fixed daily timeline blocks: Day, Evening, and Night. Edit one of them to change its start time or scene.');
     }
 
     public function store(Request $request, Device $device): RedirectResponse
@@ -90,7 +77,6 @@ class SmartFountainScheduleController extends Controller
             'device' => $device,
             'schedule' => $schedule->fresh(),
             'scenes' => $device->scenes()->orderBy('name')->get(),
-            'dayNames' => self::DAY_NAMES,
         ]);
     }
 
@@ -112,7 +98,7 @@ class SmartFountainScheduleController extends Controller
 
         return redirect()
             ->route('devices.smart-fountain.schedules.index', $device)
-            ->with('success', 'Timeline block updated successfully.');
+            ->with('success', 'Daily timeline block updated successfully.');
     }
 
     public function toggle(Device $device, DeviceScheduleRange $schedule): RedirectResponse
@@ -129,7 +115,7 @@ class SmartFountainScheduleController extends Controller
 
         return redirect()
             ->route('devices.smart-fountain.schedules.index', $device)
-            ->with('success', 'Timeline block status updated successfully.');
+            ->with('success', 'Daily timeline block status updated successfully.');
     }
 
     public function destroy(Device $device, DeviceScheduleRange $schedule): RedirectResponse
@@ -138,14 +124,12 @@ class SmartFountainScheduleController extends Controller
 
         return redirect()
             ->route('devices.smart-fountain.schedules.index', $device)
-            ->withErrors(['schedule' => 'Timeline blocks cannot be deleted. Disable the block instead.']);
+            ->withErrors(['schedule' => 'Daily timeline blocks cannot be deleted. Disable the block instead.']);
     }
 
     private function validateTimelineBlock(Request $request, Device $device, DeviceScheduleRange $schedule): array
     {
         $validated = $request->validate([
-            'days_of_week' => ['required', 'array', 'min:1'],
-            'days_of_week.*' => ['integer', 'between:1,7'],
             'start_time' => ['required', 'date_format:H:i'],
             'start_scene_id' => [
                 'required',
@@ -156,13 +140,7 @@ class SmartFountainScheduleController extends Controller
 
         $validated['name'] = self::PERIODS[$schedule->period_key]['name'];
         $validated['period_key'] = $schedule->period_key;
-        $validated['days_of_week'] = collect($validated['days_of_week'])
-            ->map(fn ($day) => (int) $day)
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
-
+        $validated['days_of_week'] = [1, 2, 3, 4, 5, 6, 7];
         $validated['start_time'] = $validated['start_time'] . ':00';
         $validated['end_scene_id'] = $validated['start_scene_id'];
         $validated['is_enabled'] = $request->boolean('is_enabled');
@@ -183,7 +161,7 @@ class SmartFountainScheduleController extends Controller
                 continue;
             }
 
-            $device->scheduleRanges()->firstOrCreate(
+            $block = $device->scheduleRanges()->firstOrCreate(
                 ['period_key' => $periodKey],
                 [
                     'name' => $period['name'],
@@ -195,6 +173,10 @@ class SmartFountainScheduleController extends Controller
                     'is_enabled' => true,
                 ]
             );
+
+            if ($block->days_of_week !== [1, 2, 3, 4, 5, 6, 7]) {
+                $block->update(['days_of_week' => [1, 2, 3, 4, 5, 6, 7]]);
+            }
         }
 
         $this->syncTimelineBoundaries($device);
@@ -224,6 +206,7 @@ class SmartFountainScheduleController extends Controller
 
             $block->update([
                 'name' => self::PERIODS[$periodKey]['name'],
+                'days_of_week' => [1, 2, 3, 4, 5, 6, 7],
                 'end_time' => $nextBlock->start_time,
                 'end_scene_id' => $block->start_scene_id,
             ]);
