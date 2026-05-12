@@ -58,7 +58,32 @@ Early IoT platform foundation includes:
 
 ## Device-side status
 
-The ESP32/device-side runtime logic should be designed after the Laravel/API contract is stable.
+The Plant Bed firmware is now a working reference implementation for timed-action devices.
+
+Confirmed device-side behavior:
+
+- Laravel config fetch and cache
+- Laravel UTC time sync from `server_time_utc`
+- NTP time sync when available
+- DS1307 RTC UTC backup time
+- offline schedule fallback using cached schedules
+- offline schedule continues after Laravel server outage
+- offline schedule continues after ESP32 power loss/reboot when RTC time is valid
+- OLED main status page
+- OLED schedule/time page from display button
+- display button can temporarily override dry-soil warning page
+- physical manual watering button remains responsive while Laravel is offline
+
+Important time model:
+
+```text
+1. NTP time when available
+2. Laravel server_time_utc when Laravel is reachable
+3. RTC UTC backup time when offline/rebooted
+4. No valid time means local schedule fallback must not run
+```
+
+See `docs/OFFLINE_TIME_AND_SCHEDULE.md` for the full confirmed behavior and test notes.
 
 ## Priority order
 
