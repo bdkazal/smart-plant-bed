@@ -448,12 +448,12 @@
                     <section class="hero">
                         <p class="eyebrow">Smart Fountain Schedule</p>
                         <h1 class="title">Daily Timeline</h1>
-                        <p class="subtitle">Day, Evening, and Night cover the full 24 hours without gaps.</p>
+                        <p class="subtitle">Day, Evening, and Night repeat every day and cover the full 24 hours without gaps.</p>
                     </section>
 
-                    <!-- <div class="info-note">
-                        The timeline is continuous: Day ends when Evening starts, Evening ends when Night starts, and Night ends when Day starts.
-                    </div> -->
+                    <div class="info-note">
+                        This is a simple daily timeline. Weekly/day-specific scheduling is not used in Smart Fountain V1, so the ESP32 can run the cached timeline offline more reliably.
+                    </div>
 
                     <section class="timeline-strip">
                         @foreach ($schedules as $schedule)
@@ -483,7 +483,7 @@
                                         <div class="period-icon">{{ $periodIcon }}</div>
                                         <div>
                                             <h2 class="period-title">{{ $schedule->name }}</h2>
-                                            <p class="period-subtitle">{{ ucfirst($schedule->period_key) }} timeline block</p>
+                                            <p class="period-subtitle">{{ ucfirst($schedule->period_key) }} daily timeline block</p>
                                         </div>
                                     </div>
                                     <span class="state-pill {{ $schedule->is_enabled ? 'state-on' : 'state-off' }}">{{ $schedule->is_enabled ? 'On' : 'Off' }}</span>
@@ -496,8 +496,8 @@
 
                                 <div class="detail-list">
                                     <div class="detail-row">
-                                        <span>Days</span>
-                                        <span>{{ collect($schedule->days_of_week)->map(fn ($day) => $dayNames[$day] ?? $day)->join(', ') }}</span>
+                                        <span>Repeat</span>
+                                        <span>Every day</span>
                                     </div>
                                     <div class="detail-row">
                                         <span>Last Applied</span>
