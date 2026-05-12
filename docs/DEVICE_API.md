@@ -29,6 +29,55 @@ POST /api/device/heartbeat
 POST /api/device/state
 ```
 
+## `/api/device/config`
+
+Endpoint:
+
+```http
+GET /api/device/config?device_uuid=<uuid>
+```
+
+Meaning:
+
+```text
+The device fetches its latest cloud configuration and syncs server time.
+```
+
+The config response includes UTC and local server time fields:
+
+```json
+{
+  "message": "Device config fetched successfully.",
+  "server_time_utc": "2026-05-12T16:46:13+00:00",
+  "server_time_local": "2026-05-12 22:46:13",
+  "server_time": "2026-05-12 22:46:13",
+  "config": {
+    "device_uuid": "...",
+    "device_type": "smart_fountain",
+    "timezone": "Asia/Dhaka",
+    "timezone_offset_minutes": 360
+  }
+}
+```
+
+Time field meanings:
+
+```text
+server_time_utc          = canonical server time for RTC/NTP-style sync
+server_time_local        = server time converted to the device timezone
+server_time              = backward-compatible local-time alias
+timezone                 = Laravel device timezone
+timezone_offset_minutes  = current offset from UTC for that timezone
+```
+
+Firmware rules:
+
+```text
+Store RTC time as UTC.
+Use timezone/timezone_offset_minutes for local display and local schedule interpretation.
+Refresh config periodically because timezone offsets can change in DST regions.
+```
+
 ## `/api/device/state`
 
 Endpoint:
