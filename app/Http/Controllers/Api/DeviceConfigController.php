@@ -173,7 +173,6 @@ class DeviceConfigController extends Controller
                     'period' => $range->period_key,
                     'name' => $range->name,
                     'is_enabled' => (bool) $range->is_enabled,
-                    'days_of_week' => $range->days_of_week ?? [],
                     'start_time' => $this->formatTimelineTime($range->start_time),
                     'end_time' => $this->formatTimelineTime($range->end_time),
                     'scene_id' => $scene?->id,
@@ -185,6 +184,7 @@ class DeviceConfigController extends Controller
 
         return [
             'enabled' => $ranges->contains(fn(array $range) => $range['is_enabled']),
+            'repeat' => 'daily',
             'ranges' => $ranges,
         ];
     }
