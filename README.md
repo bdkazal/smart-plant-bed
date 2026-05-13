@@ -1,4 +1,4 @@
-# Biztola IoT Platform / Smart Plant Bed MVP
+# Biztola IoT Platform
 
 This Laravel project is evolving from a single **Smart Plant Bed** backend into the shared **Biztola IoT Platform**.
 
