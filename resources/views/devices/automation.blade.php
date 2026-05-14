@@ -447,7 +447,7 @@
                                     <option value="schedule" @selected(($device->wateringRule?->watering_mode ?? 'schedule') === 'schedule')>Schedule</option>
                                 </select>
 
-                                @if ($latestReading && ! is_null($latestReading->soil_moisture))
+                                @if ($hasCurrentSoilMoistureReading)
                                 <p class="status-help good">Current soil moisture data is available. Auto mode can operate.</p>
                                 @else
                                 <p class="status-help warn">Current soil moisture data is unavailable. Auto mode needs a valid moisture reading.</p>
