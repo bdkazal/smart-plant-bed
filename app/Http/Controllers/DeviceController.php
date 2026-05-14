@@ -166,6 +166,8 @@ class DeviceController extends Controller
         ]);
 
         $latestReading = $device->sensorReadings->first();
+        $isOnline = $this->isDeviceOnline($device);
+        $hasCurrentSoilMoistureReading = $isOnline && $latestReading && ! is_null($latestReading->soil_moisture);
         $timezoneOptions = $this->getTimezoneOptions();
         $enabledScheduleCount = $device->wateringSchedules->where('is_enabled', true)->count();
 
@@ -173,7 +175,9 @@ class DeviceController extends Controller
             'device',
             'latestReading',
             'timezoneOptions',
-            'enabledScheduleCount'
+            'enabledScheduleCount',
+            'isOnline',
+            'hasCurrentSoilMoistureReading'
         ));
     }
 
@@ -243,16 +247,13 @@ class DeviceController extends Controller
         ]);
 
         $latestReading = $device->sensorReadings()->latest()->first();
+        $hasCurrentSoilMoistureReading = $this->isDeviceOnline($device)
+            && $latestReading
+            && ! is_null($latestReading->soil_moisture);
 
-        if (
-            $validated['watering_mode'] === 'auto' &&
-            (
-                ! $latestReading ||
-                is_null($latestReading->soil_moisture)
-            )
-        ) {
+        if ($validated['watering_mode'] === 'auto' && ! $hasCurrentSoilMoistureReading) {
             return back()->withErrors([
-                'watering_mode' => 'Auto mode requires a current soil moisture reading. Select schedule mode or reconnect the moisture sensor and send a valid reading first.',
+                'watering_mode' => 'Current soil moisture data is unavailable. Auto mode needs a valid moisture reading.',
             ]);
         }
 
