@@ -124,6 +124,7 @@ class DeviceController extends Controller
                 'timezone' => $device->timezone ?? 'Asia/Dhaka',
                 'mode' => $device->wateringRule?->watering_mode ?? 'schedule',
                 'mode_label' => ucfirst($device->wateringRule?->watering_mode ?? 'schedule'),
+                'soil_moisture_threshold' => $device->wateringRule?->soil_moisture_threshold ?? 35,
                 'enabled_schedule_count' => $device->wateringSchedules->count(),
                 'last_seen_human' => $device->last_seen_at?->diffForHumans() ?? 'Never',
                 'is_online' => $this->isDeviceOnline($device),
