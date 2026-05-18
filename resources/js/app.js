@@ -6,29 +6,62 @@ function setText(id, value) {
     el.textContent = value ?? 'N/A';
 }
 
-function plantBedSoilStatus(value) {
+function plantBedSoilStatus(value, threshold = 35) {
     if (value === null || value === undefined || value === 'N/A') {
-        return { label: 'No reading yet', key: 'optimal' };
+        return { label: 'N/A', key: 'unavailable' };
     }
 
     const number = Number(value);
+    const triggerThreshold = Number.isFinite(Number(threshold))
+        ? Math.max(0, Math.min(100, Number(threshold)))
+        : 35;
 
     if (!Number.isFinite(number)) {
-        return { label: 'No reading yet', key: 'optimal' };
+        return { label: 'N/A', key: 'unavailable' };
     }
 
-    if (number < 35) {
+    if (number <= 15) {
+        return { label: 'Very Dry', key: 'very-dry' };
+    }
+
+    if (number <= 30) {
         return { label: 'Dry', key: 'dry' };
     }
 
-    if (number > 85) {
+    if (number <= triggerThreshold) {
+        return { label: 'Low', key: 'low' };
+    }
+
+    if (number <= 75) {
+        return { label: 'OK', key: 'ok' };
+    }
+
+    if (number <= 90) {
         return { label: 'Wet', key: 'wet' };
     }
 
-    return { label: 'Optimal', key: 'optimal' };
+    return { label: 'Very Wet', key: 'very-wet' };
 }
 
-function updatePlantBedSoilGauge(value) {
+function applyPlantBedSoilBadgeStyle(badge, statusKey) {
+    const styles = {
+        unavailable: ['#64748b', '#94a3b8', 'rgba(148, 163, 184, 0.16)'],
+        'very-dry': ['#991b1b', '#ef4444', 'rgba(239, 68, 68, 0.16)'],
+        dry: ['#b45309', '#f59e0b', 'rgba(245, 158, 11, 0.14)'],
+        low: ['#a16207', '#eab308', 'rgba(234, 179, 8, 0.16)'],
+        ok: ['#15803d', '#22c55e', 'rgba(34, 197, 94, 0.16)'],
+        wet: ['#1d4ed8', '#2563eb', 'rgba(37, 99, 235, 0.14)'],
+        'very-wet': ['#0e7490', '#06b6d4', 'rgba(6, 182, 212, 0.16)'],
+    };
+
+    const [color, dotColor, glowColor] = styles[statusKey] ?? styles.unavailable;
+
+    badge.style.color = color;
+    badge.style.setProperty('--soil-dot-color', dotColor);
+    badge.style.setProperty('--soil-dot-glow', glowColor);
+}
+
+function updatePlantBedSoilGauge(value, threshold = 35) {
     const progress = document.getElementById('soil-gauge-progress');
     const badge = document.getElementById('soil-status-badge');
     const number = Number(value);
@@ -42,9 +75,10 @@ function updatePlantBedSoilGauge(value) {
     }
 
     if (badge) {
-        const status = plantBedSoilStatus(value);
+        const status = plantBedSoilStatus(value, threshold);
         badge.textContent = status.label;
         badge.className = `soil-state ${status.key}`;
+        applyPlantBedSoilBadgeStyle(badge, status.key);
     }
 }
 
@@ -147,6 +181,7 @@ async function refreshPlantBedDashboard() {
         const data = await response.json();
         const isOnline = Boolean(data?.device?.is_online);
         const latestReading = data?.latest_reading ?? {};
+        const soilMoistureThreshold = data?.device?.soil_moisture_threshold ?? 35;
 
         setText('device-name', data?.device?.name);
         setText('device-status', isOnline ? 'Online' : 'Offline');
@@ -167,7 +202,7 @@ async function refreshPlantBedDashboard() {
         setText('reading-recorded', isOnline ? (latestReading.recorded_at ?? 'N/A') : 'N/A');
         setText('manual-max-duration', data?.manual?.max_duration);
 
-        updatePlantBedSoilGauge(soilValue);
+        updatePlantBedSoilGauge(soilValue, soilMoistureThreshold);
         updatePlantBedOnlineBadge(isOnline);
         updatePlantBedManualState(data);
     } catch (error) {
